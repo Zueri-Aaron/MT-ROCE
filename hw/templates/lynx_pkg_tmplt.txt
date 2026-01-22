@@ -441,10 +441,11 @@ package lynxTypes;
         logic [32-OPCODE_BITS-STRM_BITS-2-DEST_BITS-PID_BITS-DEST_BITS-1:0] rsrvd;
     } ack_t;
 
+    // MT zaaron
     typedef struct packed {
         ack_t ack;
         logic last;
-        logic [RDMA_TIME_BITS-1:0] time;              
+        logic [RDMA_TIME_BITS-1:0] rtt_time;              
     } dack_t;
 
     typedef struct packed {
