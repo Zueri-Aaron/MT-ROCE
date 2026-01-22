@@ -121,6 +121,8 @@ assign rdma_ack.data.ack.dest = ack_meta_data[32+RDMA_QPN_BITS+1+:DEST_BITS];
 assign rdma_ack.data.ack.strm = ack_meta_data[32+RDMA_QPN_BITS+1+DEST_BITS+:STRM_BITS];
 assign rdma_ack.data.ack.rsrvd = 0;
 assign rdma_ack.data.last = ack_meta_data[32+RDMA_QPN_BITS+1+DEST_BITS+STRM_BITS+:1];
+// MT zaaron 32+RDMA_QPN_BITS+1+DEST_BITS+STRM_BITS+1 = 55
+assign rdma_ack.data.time = ack_meta_data[34+RDMA_QPN_BITS+DEST_BITS+STRM_BITS+:RDMA_TIME_BITS];
 
 rdma_flow inst_rdma_flow (
     .aclk(nclk),

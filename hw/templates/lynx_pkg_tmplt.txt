@@ -190,6 +190,8 @@ package lynxTypes;
     parameter integer OFFS_BITS = 6;
     parameter integer OPCODE_BITS = 5;
     parameter integer STRM_BITS = 2;
+    //MT zaaron
+    parameter integer RDMA_TIME_BITS = 32;
 
     parameter integer LOCAL_READ = 1;
     parameter integer LOCAL_WRITE = 2;
@@ -265,7 +267,8 @@ package lynxTypes;
     parameter integer RC_RDMA_READ_RESP_ONLY = 5'h10;
     parameter integer RC_ACK = 5'h11;
 
-    parameter integer RDMA_ACK_BITS = 64;
+    // MT zaaron
+    parameter integer RDMA_ACK_BITS = 96;
     parameter integer RDMA_ACK_QPN_BITS = 10;
     parameter integer RDMA_ACK_SYNDROME_BITS = 8;
     parameter integer RDMA_ACK_PSN_BITS = 24;
@@ -441,6 +444,7 @@ package lynxTypes;
     typedef struct packed {
         ack_t ack;
         logic last;
+        logic [RDMA_TIME_BITS-1:0] time;              
     } dack_t;
 
     typedef struct packed {
