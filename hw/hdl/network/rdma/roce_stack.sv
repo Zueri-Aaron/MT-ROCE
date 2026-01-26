@@ -133,6 +133,24 @@ rdma_flow inst_rdma_flow (
     .m_ack(m_rdma_ack)
 );
 
+//MT zaaron
+rdma_ack inst_rdma_ack (
+    .clk(nclk),
+    .probe0(s_axis_rx.tvalid),
+    .probe1(s_axis_rx.tready),
+    .probe2(s_axis_rx.tdata),     // 512
+    .probe3(s_axis_rx.tkeep),     // 64
+    .probe4(s_axis_rx.tlast),
+    .probe5(rdma_ack.valid),
+    .probe6(rdma_ack.ready),
+    .probe7(ack_meta_data),    // 96
+    .probe8(m_axis_tx.tvalid),
+    .probe9(m_axis_tx.tready),
+    .probe10(m_axis_tx.tdata),     // 512
+    .probe11(m_axis_tx.tkeep),     // 64
+    .probe12(m_axis_tx.tlast)
+);
+
 ///////////////////////////////////////////////////////////////////////////
 //
 // Additions on the TX-path: Read Request Cutter sits before the ICRC and brings RDMA READ REQUESTs into the right format for Mellanox-cards
