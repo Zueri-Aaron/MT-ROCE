@@ -1,4 +1,4 @@
-examples/
+examples/09_perf_rdma/hw/old_builds/
 build*/
 bstreams/
 bitstreams/
