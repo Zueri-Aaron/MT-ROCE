@@ -382,6 +382,7 @@ ila_rdma inst_ila_rdma (
 metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_0 ();
 metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_1 ();
 metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_2 ();
+metaIntf #(.STYPE(logic[31:0])) transport_timer_dbg (); //MT zaaron
 assign m_axis_dbg_0.ready = 1'b1;
 assign m_axis_dbg_1.ready = 1'b1;
 assign m_axis_dbg_2.ready = 1'b1;
