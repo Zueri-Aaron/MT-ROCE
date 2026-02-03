@@ -1,0 +1,233 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Features &mdash; Coyote v0.2.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=cc40f7fa"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Quick start" href="quick-start.html" />
+    <link rel="prev" title="System overview" href="overview.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            Coyote
+              <img src="../_static/cyt_logo_dark.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Introduction</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">System overview</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Features</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#unified-application-interface">Unified application interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#multi-tenancy">Multi-tenancy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#memory">Memory</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#networking">Networking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#gpu-integration">GPU integration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dynamic-reconfiguration">Dynamic reconfiguration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#simulation-environment">Simulation environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#python-run-time">Python run-time</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quick-start.html">Quick start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">Frequently asked questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publications.html">Citation and publications</a></li>
+<li class="toctree-l1"><a class="reference internal" href="release-notes.html">Release notes</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developer guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../developer/index.html">Developer Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/sw.html">Software</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/driver.html">Device driver</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">Coyote</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Features</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/intro/features.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="features">
+<span id="id1"></span><h1>Features<a class="headerlink" href="#features" title="Link to this heading"></a></h1>
+<p>In this section, we delve into some of the most importand abstractions and features provided by Coyote.</p>
+<section id="unified-application-interface">
+<h2>Unified application interface<a class="headerlink" href="#unified-application-interface" title="Link to this heading"></a></h2>
+<p>One of the core goals of Coyote is to make hardware acceleration accessible even for users with little to none FPGA experience, the simplicity of the user interfaces in vFPGAs is a must.
+The user interface is the sole point of contact between the user-supplied application logic (vFPGA) and the abstraction mechanisms included in Coyote.
+The interfaces serve as entry and exit points for both data and control flow to and from the vFPGAs.
+Generally, Coyote exposes the following interfaces to vFPGAs:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">axis_host_recv|send</span></code>: AXI4 Stream interface for receiving/sending data from/to the host memory. The number of parallel streams from host memory to the vFPGA can be determined by the user.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">axis_card_recv|send</span></code>: AXI4 Stream interface for receiving/sending data from the FPGA-attached memory (HBM or DDR). The number of parallel streams from the memory to the vFPGA can be determined by the user.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cq_rd|wr</span></code>: Completion queues for reads/writes: a streaming interface to receive completion events for finished transactions that originated in the vFPGA.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sq_rd|wr</span></code>: Send queues for reads/writes: a streaming interface used for defining read and write operations, by specifying the virtual address, length, etc.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">axi_ctrl</span></code>: AXI4 Lite interface used for setting control registers within the vFPGA. This allows an interaction between host and vFPGA via PCIe through which the vFPGA becomes the origin of the control flow. The use of this interface is demonstrated in Examples 3 and 7.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">notify</span></code>: A stream interface which allows the vFPGA to send notifications to the software program running on the host, leading to an interrupt. Obviously, this is useful for exception handling and system control messages.</p></li>
+</ul>
+<p>Network specific interfaces: if the user specifies a network stack (TCP/IP or RDMA) in the build parameters, the corresponding AXI4 Stream interfaces will be exposed in the vFPGA. For RDMA, these interfaces are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">axis_rreq_send|recv</span></code>: This interface is used for transporting locally requested data from/to the vFPGA to/from the RDMA stack as payload for outgoing RDMA_WRITE operations.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">axis_rrsp_send|recv</span></code>: This interface is used for transporting remotely requested data from/to the vFPGA to/from the RDMA stack as payload for outgoing RDMA_READ_RESPONSE operations.</p></li>
+</ul>
+<p>Similar to the hardware interfaces, Coyote also provides a generic and unified software handle to users, allowing them to efficiently control the vFPGAs from host software.
+The core concept here is the Coyote Thread (<code class="docutils literal notranslate"><span class="pre">cThread</span></code>), which maps to a single vFPGA. As shown in Example 1, data movements can be invoked from such a thread, and the completion of such operations be checked by polling the respective status registers associated with this thread.</p>
+</section>
+<section id="multi-tenancy">
+<h2>Multi-tenancy<a class="headerlink" href="#multi-tenancy" title="Link to this heading"></a></h2>
+<p>One of the key advantages of using Coyote in a datacenter or cloud computing environment is its wide-ranging support for multi-tenancy and multi-threading, allowing to utilize the reconfigurable fabric more efficiently. Multi-tenancy is realized in Coyote in two ways:</p>
+<ul class="simple">
+<li><p>Spatial multi-tenancy: Coyote allows for multiple vFPGAs in the application layer. All core system abstractions and services: host interaction via PCIe, access to the card-attached HBM and the networking stack are provided equally to all vFPGAs through sophisticated arbitration and scheduling mechanisms.</p></li>
+<li><p>Temporal multi-tenancy: Coyote supports partial reconfiguration on the vFPGA level, meaning that single applications residing in vFPGAs can be swapped in and out during run-time. The once configured and built system abstractions can thus be used sequentially by different applications while avoiding the lengthy process of generating a full application-specific bitstream.</p></li>
+</ul>
+</section>
+<section id="memory">
+<h2>Memory<a class="headerlink" href="#memory" title="Link to this heading"></a></h2>
+<p>In Coyote, all memory resources, including those on the host system and the FPGA card, are virtualized.
+This approach abstracts the physical memory details, allowing vFPGAs to access memory seamlessly without direct concern for its physical location.
+Additionally, virtualized memory is a mechanism for data protection and process isolation, as different vFPGAs can only access their own memory; akin to the virtual memory model in a typical OS.
+Similar to conventional virtual memory models, Coyote incorporates translation lookaside buffers (TLBs) within its memory management unit (MMU) for efficient virtual-to-physical address look-ups.
+The TLBs are highly configurable through synthesis parameters and are implemented using on-chip RAM (BRAM), therefore acheiving very fast look-ups.</p>
+<p>Coyote facilitates direct access to host memory from the FPGA through the <code class="docutils literal notranslate"><span class="pre">axis_host_recv|send</span></code> interface.
+This capability allows the vFPGA accelerators to directly access host memory, with no intermediate copies to card memory.
+On the card, Coyote automatically instantiates the necessary controllers for High Bandwidth Memory (HBM) or Double Data Rate (DDR) memory on the card.
+Additionally, Coyote implements striping, ensuring that the data buffer is equally partitioned accorss all the HBM banks, thus maximising bandwidth and reducing pipeline stalls.
+This simplifies the development effort, enabling the developers to focus on application implementation and performance tuning.
+The data from card memory is through the <code class="docutils literal notranslate"><span class="pre">axis_card_recv|send</span></code> interface.</p>
+</section>
+<section id="networking">
+<h2>Networking<a class="headerlink" href="#networking" title="Link to this heading"></a></h2>
+<p>Coyote comes with two different full-fledged networking stacks: 100G TCP/IP and 100G RoCE v2, openning up research possibilities for hardware and systems research alike.
+Notably, these stacks place the FPGA as an equal-class citizen in the datacenter and enable scale-out accelerated applications.
+More specifically, Coyote can be used as a basis for building SmartNICs and SmartHubs by offering application offload directly on the network datapaths.
+For many stream-based data preprocessing tasks, such as ML data pre-processing, such off-loads can significantly improve performance, compared to off-datapath processing, which is available in many commercial SmartNICs and Data Processing Units.
+Another benefit of Coyote compared to commercial platforms lies in the fact that both of the network stacks are completely open-source and can therefore be customized and modified in new ways to test new concepts of high-performance networking.</p>
+</section>
+<section id="gpu-integration">
+<h2>GPU integration<a class="headerlink" href="#gpu-integration" title="Link to this heading"></a></h2>
+<p>Recognising the importance of heteregenous computing in the era of big data and AI, Coyote aims simplify the integration of FPGAs with other accelerators and NICs. As stated above, Coyote’s RDMA stack is fully RoCEv2-compliant, meaning it can interface directly with off-the-shelf commodity NICs.
+Additionally, Coyote includes support for DMA with AMD Instinct GPUs, by exporting GPU memory as a DMABuf. By doing so, data transfers between the GPU and FPGA can completely bypass CPU memory, minimising latency and reducing CPU utilization.
+For more details on how to use Coyote with GPU support, check out <em>Example 6: GPU P2P</em> Below is a figure showcasing the throughput of data movement between a GPU and an FPGA.</p>
+<figure class="align-center">
+<a class="reference internal image-reference" href="../_images/gpu_bw.png"><img alt="../_images/gpu_bw.png" height="293" src="../_images/gpu_bw.png" width="506" />
+</a>
+</figure>
+</section>
+<section id="dynamic-reconfiguration">
+<h2>Dynamic reconfiguration<a class="headerlink" href="#dynamic-reconfiguration" title="Link to this heading"></a></h2>
+<p>Coyote supports two types of reconfiguration: shell and partial (application) reconfiguration.
+Recall, Coyote’s hardware stack consists of the static layer and the shell (dynamic layer + application layer).
+The primary purpose of the static layer is facilitate communication and data movement between the host CPU and the FPGA. For the same chip, the static layer always remains the same; that is, it cannot be reconfigured.
+The shell includes all of Coyote’s services (networking stacks, memory controllers, TLBs etc.) and user applications (vFPGAs).</p>
+<p>Shell reconfiguration refers to the reconfiguration of the entire shell: both the services (dynamic layer) and the user applications (application layer) are reconfigured.
+For example, in the figure below, the first shell is built with HBM, no networking and includes one vFPGA for vector addition.
+The new shell includes no HBM controller, but instead has RDMA enabled with two vFPGAs (encryption, compression).
+Importantly, the two shells are completely different: the first one has no networking and one user application, the other one includes networking and two user applications.
+Shell reconfiguration can be done at any time from the software, provided the two shells were linked against the same static layer. For more details on the nuances of shell reconfiguration, see <em>Example 5: Shell reconfiguration</em>.</p>
+<figure class="align-center">
+<a class="reference internal image-reference" href="../_images/shell_reconfigure.png"><img alt="../_images/shell_reconfigure.png" height="273" src="../_images/shell_reconfigure.png" width="595" />
+</a>
+</figure>
+<p>On the other hand, partial reconfiguration (PR) refers to the reconfiguration of user applications (vFPGAs).
+The services (networking stacks, memory controllers, TLBs) and the number of vFPGAs stays the same, but the application logic changes.
+For more details on the nuances of partial reconfiguration, see <em>Example 9: Partial reconfiguration</em>.</p>
+</section>
+<section id="simulation-environment">
+<h2>Simulation environment<a class="headerlink" href="#simulation-environment" title="Link to this heading"></a></h2>
+<p>Coyote features a simulation environment that can be used to test the hardware code in the Vivado simulator without having to synthesize the project.
+It wraps the vFPGA code in a testbench which simulates host and card memory streams and the corresponding request interfaces and the <code class="docutils literal notranslate"><span class="pre">axi_ctrl</span></code> and <code class="docutils literal notranslate"><span class="pre">notify</span></code> interfaces.
+The simulation environment may either be used with a Python unit test framework which allows to write unit test for vFPGAs or a simulation target for the Coyote library.
+The latter allows the user to compile the software code that they would use to interact with the actual hardware against the simulation.
+The networking-related interfaces are currently not supported.</p>
+</section>
+<section id="python-run-time">
+<h2>Python run-time<a class="headerlink" href="#python-run-time" title="Link to this heading"></a></h2>
+<p>In addition to Coyote’s C++ software API, Coyote also provides a Python run-time, <a class="reference external" href="https://github.com/fpgasystems/pyCoyote">pyCoyote</a>, that exposes the same functionality as the C++ library.
+This allows users to interact with Coyote from Python, providing a higher level of abstraction as well as integration with popular Python libraries such as NumPy.
+The Python run-time is built using <cite>pybind11</cite>, which creates bindings between C++ and Python.
+The Python run-time supports most of Coyote’s features, including multi-tenancy, data movement, interrupts, and reconfiguration.
+For more details on how to use the Python run-time, check out the <a class="reference external" href="https://github.com/fpgasystems/pyCoyote">pyCoyote repository</a>. and the corresponding examples.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="overview.html" class="btn btn-neutral float-left" title="System overview" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="quick-start.html" class="btn btn-neutral float-right" title="Quick start" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, System Group, ETH Zurich.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
