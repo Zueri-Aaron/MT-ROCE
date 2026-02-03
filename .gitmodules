@@ -1,4 +1,4 @@
 [submodule "hw/services/network"]
 	path = hw/services/network
-	url = git@github.com:Zueri-Aaron/network.git
+	url = https://github.com/Zueri-Aaron/MT-ROCE.git
 	branch = my_changes
