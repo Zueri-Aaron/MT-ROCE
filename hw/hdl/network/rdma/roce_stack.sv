@@ -148,7 +148,10 @@ rdma_ack inst_rdma_ack (
     .probe9(m_axis_tx.tready),
     .probe10(m_axis_tx.tdata),     // 512
     .probe11(m_axis_tx.tkeep),     // 64
-    .probe12(m_axis_tx.tlast)
+    .probe12(m_axis_tx.tlast),
+    .probe13(transport_timer_dbg.tvalid),
+    .probe14(transport_timer_dbg.tready),
+    .probe15(transport_timer_dbg.data)    // 32
 );
 
 ///////////////////////////////////////////////////////////////////////////
@@ -382,6 +385,7 @@ metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_2 ();
 assign m_axis_dbg_0.ready = 1'b1;
 assign m_axis_dbg_1.ready = 1'b1;
 assign m_axis_dbg_2.ready = 1'b1;
+assign transport_timer_dbg.ready = 1'b1; //MT zaaron
 
 rocev2_ip rocev2_inst(
     .ap_clk(nclk), // input aclk
@@ -402,6 +406,11 @@ rocev2_ip rocev2_inst(
     .m_axis_dbg_2_TVALID(m_axis_dbg_2.valid),
     .m_axis_dbg_2_TREADY(m_axis_dbg_2.ready),
     .m_axis_dbg_2_TDATA(m_axis_dbg_2.data),
+
+    //MT zaaron 
+    .transport_timer_dbg_TVALID(transport_timer_dbg.valid),
+    .transport_timer_dbg_TREADY(transport_timer_dbg.ready),
+    .transport_timer_dbg_TDATA(transport_timer_dbg.data),
 `endif
 
     // RX

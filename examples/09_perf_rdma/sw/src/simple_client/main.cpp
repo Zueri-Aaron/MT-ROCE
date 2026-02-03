@@ -26,6 +26,7 @@
 
 #include <iostream>
 #include <cstdlib>
+
 #include <chrono>
 #include <thread>
 
@@ -33,58 +34,80 @@
 #include <boost/program_options.hpp>
 
 // Coyote-specific includes
+#include "cBench.hpp"
 #include "cThread.hpp"
 #include "constants.hpp"
 
-constexpr bool const IS_CLIENT = false;
+constexpr bool const IS_CLIENT = true;
 
 // Note, how the Coyote thread is passed by reference; to avoid creating a copy of 
 // the thread object which can lead to undefined behaviour and bugs. 
-void run_write_only_server(
-    coyote::cThread &coyote_thread, coyote::rdmaSg &sg, int *mem, uint n_runs
+void run_write_only(
+    coyote::cThread &coyote_thread, coyote::rdmaSg &sg, 
+    int *mem, uint n_runs
 ) {
+    // When writing, the server asserts the written payload is correct (which the client sets)
+    // When reading, the client asserts the read payload is correct (which the server sets)
+    for (uint i = 0; i < sg.len / sizeof(int); i++) {
+        mem[i] = i;         
+    }
+    
+    // Before every benchmark, clear previous completion flags and sync with server
+    // Sync is in a way equivalent to MPI_Barrier()
+    
     coyote_thread.clearCompleted();
     coyote_thread.connSync(IS_CLIENT);
-
-    // Wait for client writes to complete
-    while (coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) != n_runs) {
-        std::cout << "server waiting on " << coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes\n" << std::flush;
+    
+    
+    /* Benchmark function; as eplained in the README
+     * For RDMA_WRITEs, the client writes multiple times to the server and then the server writes the same content back
+     * For RDMA READs, the client reads from the server multiple times
+     * In boths cases, that means there will be n_transfers completed writes to local memory (LOCAL_WRITE)
+     */
+          
+    for (uint i = 0; i < n_runs; i++) {
+        coyote_thread.invoke(coyote::CoyoteOper::REMOTE_RDMA_WRITE, sg);
+    }
+    using namespace std::chrono_literals;
+    while (coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) != 1) {
+        std::cout << "client waiting on " << coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes\n" << std::flush;
         std::this_thread::sleep_for(1s);
         std::cout << "cool\n" << std::flush;
     }
-
-    coyote_thread.invoke(coyote::CoyoteOper::REMOTE_RDMA_WRITE, sg);
 }
 
-
 int main(int argc, char *argv[])  {
-    // CLI arguments
+    std::string server_ip;
     unsigned int size, n_runs;
 
     boost::program_options::options_description runtime_options("Coyote Perf RDMA Options");
     runtime_options.add_options()
+        ("ip_address,i", boost::program_options::value<std::string>(&server_ip), "Server's IP address")
         ("runs,r", boost::program_options::value<unsigned int>(&n_runs)->default_value(N_RUNS_DEFAULT), "Number of times to repeat the test")
         ("size,x", boost::program_options::value<unsigned int>(&size)->default_value(64), "Starting (minimum) transfer size");
     boost::program_options::variables_map command_line_arguments;
     boost::program_options::store(boost::program_options::parse_command_line(argc, argv, runtime_options), command_line_arguments);
     boost::program_options::notify(command_line_arguments);
 
-    // Allocate Coyothe threa and set-up RDMA connections, buffer etc.
-    // initRDMA is explained in more detail in client/main.cpp
-    coyote::cThread coyote_thread(DEFAULT_VFPGA_ID, getpid());
-    int *mem = (int *) coyote_thread.initRDMA(size, coyote::DEF_PORT);
+    if (server_ip.empty()) {
+        std::cerr << "Error: server IP must be specified with -i\n";
+        return EXIT_FAILURE;
+    }
+
+    coyote::cThread coyote_thread(DEFAULT_VFPGA_ID, getpid(), 0);
+    int *mem = (int *) coyote_thread.initRDMA(size, coyote::DEF_PORT, server_ip.c_str());
     if (!mem) { throw std::runtime_error("Could not allocate memory; exiting..."); }
 
-    // Benchmark sweep; exactly like done in the client code
-    HEADER("RDMA BENCHMARK: SERVER");
+    HEADER("RDMA BENCHMARK: CLIENT");
     coyote::rdmaSg sg = { .len = size };
-    run_write_only_server(
+
+    run_write_only(
         coyote_thread,
         sg,
         mem,
         n_runs
     );
-    // Final sync and exit
+    
     std::cout << "very cool\n" << std::flush;
     coyote_thread.connSync(IS_CLIENT);
     return EXIT_SUCCESS;
