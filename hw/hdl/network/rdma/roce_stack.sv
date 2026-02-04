@@ -149,8 +149,8 @@ rdma_ack inst_rdma_ack (
     .probe10(m_axis_tx.tdata),     // 512
     .probe11(m_axis_tx.tkeep),     // 64
     .probe12(m_axis_tx.tlast),
-    .probe13(transport_timer_dbg.tvalid),
-    .probe14(transport_timer_dbg.tready),
+    .probe13(transport_timer_dbg.valid),
+    .probe14(transport_timer_dbg.ready),
     .probe15(transport_timer_dbg.data)    // 32
 );
 
