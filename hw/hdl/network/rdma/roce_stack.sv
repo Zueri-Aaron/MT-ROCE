@@ -151,7 +151,10 @@ rdma_ack inst_rdma_ack (
     .probe12(m_axis_tx.tlast),
     .probe13(transport_timer_dbg.valid),
     .probe14(transport_timer_dbg.ready),
-    .probe15(transport_timer_dbg.data)    // 32
+    .probe15(transport_timer_dbg.data), // 32
+    .probe16(transport_protocol_dbg.valid),
+    .probe17(transport_protocol_dbg.ready),
+    .probe18(transport_protocol_dbg.data)  //32
 );
 
 ///////////////////////////////////////////////////////////////////////////
@@ -383,10 +386,12 @@ metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_0 ();
 metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_1 ();
 metaIntf #(.STYPE(logic[103:0])) m_axis_dbg_2 ();
 metaIntf #(.STYPE(logic[31:0])) transport_timer_dbg (); //MT zaaron
+metaIntf #(.STYPE(logic[31:0])) transport_protocol_dbg ();
 assign m_axis_dbg_0.ready = 1'b1;
 assign m_axis_dbg_1.ready = 1'b1;
 assign m_axis_dbg_2.ready = 1'b1;
 assign transport_timer_dbg.ready = 1'b1; //MT zaaron
+assign transport_protocol_dbg.ready = 1'b1;
 
 rocev2_ip rocev2_inst(
     .ap_clk(nclk), // input aclk
@@ -412,6 +417,10 @@ rocev2_ip rocev2_inst(
     .transport_timer_dbg_TVALID(transport_timer_dbg.valid),
     .transport_timer_dbg_TREADY(transport_timer_dbg.ready),
     .transport_timer_dbg_TDATA(transport_timer_dbg.data),
+
+    .transport_protocol_dbg_TVALID(transport_protocol_dbg.valid),
+    .transport_protocol_dbg_TREADY(transport_protocol_dbg.ready),
+    .transport_protocol_dbg_TDATA(transport_protocol_dbg.data),
 `endif
 
     // RX
