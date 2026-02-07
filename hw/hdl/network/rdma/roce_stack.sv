@@ -124,6 +124,7 @@ assign rdma_ack.data.last = ack_meta_data[32+RDMA_QPN_BITS+1+DEST_BITS+STRM_BITS
 // MT zaaron 32+RDMA_QPN_BITS+1+DEST_BITS+STRM_BITS+1 = 55
 assign rdma_ack.data.rtt_time = ack_meta_data[34+RDMA_QPN_BITS+DEST_BITS+STRM_BITS+:RDMA_TIME_BITS];
 
+`ifdef DBG_IBV
 rdma_flow inst_rdma_flow (
     .aclk(nclk),
     .aresetn(nresetn),
@@ -132,6 +133,17 @@ rdma_flow inst_rdma_flow (
     .s_ack(rdma_ack),
     .m_ack(m_rdma_ack)
 );
+
+//MT zaaron clock for debugging
+logic [31:0] cycle_count_dbg;
+
+always_ff @(posedge nclk or negedge nresetn) begin
+    if (!nresetn)
+        cycle_count_dbg <= 64'd0;
+    else
+        cycle_count_dbg <= cycle_count_dbg + 1;
+end
+
 
 //MT zaaron
 rdma_ack inst_rdma_ack (
@@ -154,8 +166,10 @@ rdma_ack inst_rdma_ack (
     .probe15(transport_timer_dbg.data), // 32
     .probe16(transport_protocol_dbg.valid),
     .probe17(transport_protocol_dbg.ready),
-    .probe18(transport_protocol_dbg.data)  //32
+    .probe18(transport_protocol_dbg.data),  //32
+    .probe19(cycle_count_dbg)   // 32
 );
+`endif
 
 ///////////////////////////////////////////////////////////////////////////
 //
