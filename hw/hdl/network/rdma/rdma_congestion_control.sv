@@ -31,16 +31,24 @@ module rdma_congestion_control (
     input  logic [31:0]         rtt,
     input  logic                ack_event,
 
-    output logic [31:0]         cwnd,
-
     input  logic                aclk,
-    input  logic                aresetn
+    input  logic                aresetn,
+
+    metaIntf.s                  s_req,
+    metaIntf.m                  m_req
 );
 
 logic [31:0] base_rtt;
 logic [31:0] target_delay;
 logic [31:0] acc; // accumulated ACKs for avoiding division
+logic [31:0] acc_next;
 logic [31:0] ai = 1; // additive constant for increasing cwnd
+logic [31:0] cwnd; // congestion window in number of packets
+logic [31:0] cwnd_next;
+logic [31:0] packets_in_flight; // number of packets currently in flight
+logic [31:0] packets_in_flight_next;
+
+metaIntf #(.STYPE(dreq_t)) queue_out ();
 
 always_ff @(posedge aclk) begin
     if (!aresetn) begin
@@ -48,37 +56,75 @@ always_ff @(posedge aclk) begin
         target_delay <= 16; // TODO: figure out a good value for this
         cwnd <= 32'd1;
         acc <= 32'd0;
-    end else if (ack_event) begin
-        if (rtt < base_rtt)
-            base_rtt <= rtt;
+        packets_in_flight <= 32'd0;
+        m_req.valid <= 1'b0;
+    end else begin 
+        packets_in_flight_next = packets_in_flight;
+        cwnd_next = cwnd;
+        acc_next = acc;
 
-        logic [31:0] delay;
-        if (rtt > base_rtt)
-            delay = rtt - base_rtt;
-        else
-            delay = 0;
+        if (ack_event) begin
+            packets_in_flight_next = (packets_in_flight_next > 0) ? packets_in_flight_next - 1 : 0;
+            if (rtt < base_rtt)
+                base_rtt <= rtt;    // rn using old rtt
 
-        if (delay <= target_delay) begin
-            acc <= acc + ai;
-            if (acc >= cwnd) begin
-                acc <= acc - cwnd;
-                cwnd <= cwnd + 1;
-            end 
-        end else begin  // RTT nominal
-            logic [31:0] temp;
-            logic [31:0] decrease;
+            logic [31:0] delay;
+            delay = (rtt > base_rtt) ? (rtt - base_rtt) : 32'd0;
+           
 
-            temp = delay - target_delay;
-            decrease = (cwnd >> 10) * temp; // 1/1024 = beta/rtt_nominal rn
+            if (delay <= target_delay) begin
+                acc_next = acc + ai;
+                if (acc_next >= cwnd) begin
+                    acc_next = acc_next - cwnd;
+                    cwnd_next = cwnd + 1;
+                end 
+            end else begin  // RTT nominal
+                logic [31:0] temp;
+                logic [31:0] decrease;
 
-            if (decrease > (cwnd >> 1)) // rn max multiplicative decrease is 1/2
-                cwnd <= cwnd >> 1;
-            else 
-                cwnd <= cwnd - decrease;
+                temp = delay - target_delay;
+                decrease = (cwnd * temp) >> 10; // 1/1024 = beta/rtt_nominal rn
 
-            if (acc > cwnd)
-                acc <= cwnd;
+
+                if (decrease > (cwnd >> 1)) // rn max multiplicative decrease is 1/2
+                    cwnd_next = cwnd >> 1;
+                else 
+                    cwnd_next = cwnd - decrease;
+
+                if (cwnd_next == 0)
+                    cwnd_next = 1;
+
+                if (acc_next > cwnd_next)
+                    acc_next = cwnd_next;
+            end
         end
+
+        //congestion window logic
+        m_req.valid <= 1'b0;
+        queue_out.ready <= 1'b0;
+
+        if (packets_in_flight_next < cwnd_next) begin
+            m_req.valid <= queue_out.valid;
+            queue_out.ready <= m_req.ready;
+            if (queue_out.valid && m_req.ready) begin
+                packets_in_flight_next = packets_in_flight_next + 1;
+            end
+        end
+        packets_in_flight <= packets_in_flight_next;
+        cwnd <= cwnd_next;
+        acc <= acc_next;
     end
+
+    
 end
 
+queue_meta #(
+    .QDEPTH(RDMA_n_OST)
+) inst_cq (
+    .aclk(aclk),
+    .aresetn(aresetn),
+    .s_meta(s_req),
+    .m_meta(queue_out)
+);
+
+endmodule
