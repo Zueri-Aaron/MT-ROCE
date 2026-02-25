@@ -139,10 +139,46 @@ logic [31:0] cycle_count_dbg;
 
 always_ff @(posedge nclk or negedge nresetn) begin
     if (!nresetn)
-        cycle_count_dbg <= 64'd0;
+        cycle_count_dbg <= 32'd0;
     else
         cycle_count_dbg <= cycle_count_dbg + 1;
 end
+
+//MT zaaron simple FIFO Queue for timer TODO: replace with proper FIFO queue
+logic [31:0] fifo_time [0:15];
+logic [3:0] fifo_head, fifo_tail;
+logic [31:0] rtt_time_dbg;
+logic [4:0] fifo_count;
+// write to FIFO
+always_ff @(posedge nclk or negedge nresetn) begin
+    if (!nresetn) begin
+        fifo_count <= 0;
+        fifo_tail <= 0;
+    end else if (m_axis_tx.valid && m_axis_tx.ready) begin
+        if (fifo_count < 16) begin
+            fifo_time[fifo_tail] <= cycle_count_dbg;
+            fifo_tail <= (fifo_tail == 15) ? 0 : fifo_tail + 1;
+            fifo_count <= fifo_count + 1;
+        end
+    end
+end
+
+// read from FIFO
+always_ff @(posedge nclk or negedge nresetn) begin
+    if (!nresetn) begin
+        fifo_count <= 0;
+        fifo_head <= 0;
+        rtt_time_dbg <= 0;
+    end else if (s_axis_rx.tvalid && s_axis_rx.tready) begin
+        if (fifo_count > 0) begin
+            rtt_time_dbg <= cycle_count_dbg - fifo_time[fifo_head];
+            fifo_head <= (fifo_head == 15) ? 0 : fifo_head + 1;
+            fifo_count <= fifo_count - 1;
+        end    
+    end
+end
+
+
 
 
 //MT zaaron
@@ -167,7 +203,8 @@ rdma_ack inst_rdma_ack (
     .probe16(transport_protocol_dbg.valid),
     .probe17(transport_protocol_dbg.ready),
     .probe18(transport_protocol_dbg.data),  //32
-    .probe19(cycle_count_dbg)   // 32
+    .probe19(cycle_count_dbg),   // 32
+    .probe20(rtt_time_dbg)      // 32
 );
 `endif
 
