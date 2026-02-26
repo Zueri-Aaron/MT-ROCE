@@ -25,7 +25,7 @@
  */
 
 //MT zaaron implementation of SWIFT
-import lynxTypes::*;
+
 
 module dbg_rdma_congestion_control (
     input  logic [31:0]         rtt,
@@ -46,13 +46,14 @@ logic [31:0] cwnd; // congestion window in number of packets
 logic [31:0] cwnd_next;
 logic [31:0] packets_in_flight; // number of packets currently in flight
 logic [31:0] packets_in_flight_next;
+logic [31:0] delay;
 
 
 
 always_ff @(posedge aclk) begin
     if (!aresetn) begin
         base_rtt <= 32'hFFFF_FFFF; // max value
-        target_delay <= 16; // TODO: figure out a good value for this
+        target_delay <= 32'd1000; // rn we had about 1000 cycles at 4 GHz
         cwnd <= 32'd1;
         acc <= 32'd0;
         packets_in_flight <= 32'd0;
@@ -64,10 +65,10 @@ always_ff @(posedge aclk) begin
 
         if (ack_event) begin
             packets_in_flight_next = (packets_in_flight_next > 0) ? packets_in_flight_next - 1 : 0;
-            if (rtt < base_rtt)
+            if (rtt < base_rtt) begin
                 base_rtt <= rtt;    // rn using old rtt
-
-            logic [31:0] delay;
+            end
+            
             delay = (rtt > base_rtt) ? (rtt - base_rtt) : 32'd0;
            
 
