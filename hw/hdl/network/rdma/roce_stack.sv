@@ -149,7 +149,7 @@ logic [31:0] fifo_time [0:15];
 logic [3:0] fifo_head, fifo_tail;
 logic [31:0] rtt_time_dbg;
 logic [4:0] fifo_count;
-// write to FIFO
+
 always_ff @(posedge nclk or negedge nresetn) begin
     if (!nresetn) begin
         fifo_count <= 0;
@@ -178,23 +178,6 @@ always_ff @(posedge nclk or negedge nresetn) begin
         endcase
     end
 end
-
-// read from FIFO
-always_ff @(posedge nclk or negedge nresetn) begin
-    if (!nresetn) begin
-        fifo_count <= 0;
-        fifo_head <= 0;
-        rtt_time_dbg <= 0;
-    end else if (rdma_ack.valid && rdma_ack.ready) begin
-        if (fifo_count > 0) begin
-            rtt_time_dbg <= cycle_count_dbg - fifo_time[fifo_head];
-            fifo_head <= (fifo_head == 15) ? 0 : fifo_head + 1;
-            fifo_count <= fifo_count - 1;
-        end    
-    end
-end
-
-
 
 
 //MT zaaron
