@@ -27,15 +27,14 @@
 //MT zaaron implementation of SWIFT
 import lynxTypes::*;
 
-module rdma_congestion_control (
+module dbg_rdma_congestion_control (
     input  logic [31:0]         rtt,
     input  logic                ack_event,
 
     input  logic                aclk,
     input  logic                aresetn,
 
-    metaIntf.s                  s_req,
-    metaIntf.m                  m_req
+    output logic                dummy_out
 );
 
 logic [31:0] base_rtt;
@@ -48,7 +47,7 @@ logic [31:0] cwnd_next;
 logic [31:0] packets_in_flight; // number of packets currently in flight
 logic [31:0] packets_in_flight_next;
 
-metaIntf #(.STYPE(dreq_t)) queue_out ();
+
 
 always_ff @(posedge aclk) begin
     if (!aresetn) begin
@@ -57,9 +56,7 @@ always_ff @(posedge aclk) begin
         cwnd <= 32'd1;
         acc <= 32'd0;
         packets_in_flight <= 32'd0;
-        m_req.valid <= 1'b0;
-        queue_out.ready <= 1'b0;
-        m_req.data <= 0;
+        dummy_out <= 1'b0;
     end else begin 
         packets_in_flight_next = packets_in_flight;
         cwnd_next = cwnd;
@@ -102,16 +99,11 @@ always_ff @(posedge aclk) begin
         end
 
         //congestion window logic
-        m_req.valid <= 1'b0;
-        m_req.data <= queue_out.data;
-        queue_out.ready <= 1'b0;
+        dummy_out <= 1'b0;
 
         if (packets_in_flight_next < cwnd_next) begin
-            m_req.valid <= queue_out.valid;
-            queue_out.ready <= m_req.ready;
-            if (queue_out.valid && m_req.ready) begin
-                packets_in_flight_next = packets_in_flight_next + 1;
-            end
+            dummy_out <= 1'b1;
+            packets_in_flight_next = packets_in_flight_next + 1;
         end
         packets_in_flight <= packets_in_flight_next;
         cwnd <= cwnd_next;
@@ -120,14 +112,5 @@ always_ff @(posedge aclk) begin
 
     
 end
-
-queue_meta #(
-    .QDEPTH(RDMA_n_OST)
-) inst_cq (
-    .aclk(aclk),
-    .aresetn(aresetn),
-    .s_meta(s_req),
-    .m_meta(queue_out)
-);
 
 endmodule

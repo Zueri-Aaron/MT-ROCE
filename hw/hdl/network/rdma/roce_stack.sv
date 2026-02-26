@@ -154,7 +154,7 @@ always_ff @(posedge nclk or negedge nresetn) begin
     if (!nresetn) begin
         fifo_count <= 0;
         fifo_tail <= 0;
-    end else if (m_axis_tx.valid && m_axis_tx.ready) begin
+    end else if (s_rdma_sq.valid && s_rdma_sq.ready) begin
         if (fifo_count < 16) begin
             fifo_time[fifo_tail] <= cycle_count_dbg;
             fifo_tail <= (fifo_tail == 15) ? 0 : fifo_tail + 1;
@@ -169,7 +169,7 @@ always_ff @(posedge nclk or negedge nresetn) begin
         fifo_count <= 0;
         fifo_head <= 0;
         rtt_time_dbg <= 0;
-    end else if (s_axis_rx.tvalid && s_axis_rx.tready) begin
+    end else if (rdma_ack.valid && rdma_ack.ready) begin
         if (fifo_count > 0) begin
             rtt_time_dbg <= cycle_count_dbg - fifo_time[fifo_head];
             fifo_head <= (fifo_head == 15) ? 0 : fifo_head + 1;
