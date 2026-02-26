@@ -154,12 +154,28 @@ always_ff @(posedge nclk or negedge nresetn) begin
     if (!nresetn) begin
         fifo_count <= 0;
         fifo_tail <= 0;
-    end else if (s_rdma_sq.valid && s_rdma_sq.ready) begin
-        if (fifo_count < 16) begin
+        fifo_head <= 0;
+        rtt_time_dbg <= 0;
+    end else begin 
+        //write
+        if (s_rdma_sq.valid && s_rdma_sq.ready && fifo_count < 16) begin
             fifo_time[fifo_tail] <= cycle_count_dbg;
             fifo_tail <= (fifo_tail == 15) ? 0 : fifo_tail + 1;
-            fifo_count <= fifo_count + 1;
         end
+        //read
+        if (rdma_ack.valid && rdma_ack.ready && fifo_count > 0) begin
+            rtt_time_dbg <= cycle_count_dbg - fifo_time[fifo_head];
+            fifo_head <= (fifo_head == 15) ? 0 : fifo_head + 1;
+        end
+        //count
+        case ({
+            (s_rdma_sq.valid && s_rdma_sq.ready && (fifo_count < 16)),
+            (rdma_ack.valid && rdma_ack.ready && (fifo_count > 0))
+        })
+            2'b10: fifo_count <= fifo_count + 1; // write only
+            2'b01: fifo_count <= fifo_count - 1; // read only
+            default: ;                           // no change
+        endcase
     end
 end
 
