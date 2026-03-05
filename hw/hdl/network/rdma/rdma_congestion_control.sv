@@ -28,15 +28,18 @@
 import lynxTypes::*;
 
 module rdma_congestion_control (
-    input  logic [31:0]         rtt,
-    input  logic                ack_event,
-
     input  logic                aclk,
     input  logic                aresetn,
+
+    input  logic [31:0]         rtt,
+    input  logic                ack_event,
 
     metaIntf.s                  s_req,
     metaIntf.m                  m_req
 );
+
+localparam integer RDMA_N_OST = RDMA_N_WR_OUTSTANDING;
+localparam integer RDMA_OST_BITS = $clog2(RDMA_N_OST);
 
 logic [31:0] base_rtt;
 logic [31:0] target_delay;
@@ -122,7 +125,7 @@ always_ff @(posedge aclk) begin
 end
 
 queue_meta #(
-    .QDEPTH(RDMA_n_OST)
+    .QDEPTH(RDMA_N_OST)
 ) inst_cq (
     .aclk(aclk),
     .aresetn(aresetn),

@@ -131,7 +131,8 @@ rdma_flow inst_rdma_flow (
     .s_req(s_rdma_sq),
     .m_req(rdma_sq),
     .s_ack(rdma_ack),
-    .m_ack(m_rdma_ack)
+    .m_ack(m_rdma_ack),
+    .rtt(rtt_time_dbg) //MT zaaron
 );
 
 //MT zaaron clock for debugging

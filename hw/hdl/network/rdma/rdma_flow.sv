@@ -34,7 +34,9 @@ module rdma_flow (
     metaIntf.m                  m_ack,
 
     input  logic                aclk,
-    input  logic                aresetn
+    input  logic                aresetn,
+
+    input logic[31:0]          rtt
 );
 
 localparam integer RDMA_N_OST = RDMA_N_WR_OUTSTANDING;
@@ -194,6 +196,7 @@ queue_meta #(
 );
 
 // REQ queue
+/*
 queue_meta #(
     .QDEPTH(RDMA_N_OST)
 ) inst_sq (
@@ -201,6 +204,18 @@ queue_meta #(
     .aresetn(aresetn),
     .s_meta(req_out),
     .m_meta(m_req)
+);*/
+
+// MT zaaron Congestion control
+dbg_rtt_changer inst_swift(
+    .aclk(aclk),
+    .aresetn(aresetn),
+
+    .rtt(rtt),
+    .ack_event(s_ack.valid && s_ack.ready),
+
+    .s_req(req_out),
+    .m_req(m_req)
 );
 
 endmodule
