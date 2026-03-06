@@ -41,12 +41,15 @@ logic [31:0] base_rtt;
 logic [31:0] target_delay;
 logic [31:0] acc; // accumulated ACKs for avoiding division
 logic [31:0] acc_next;
-logic [31:0] ai = 1; // additive constant for increasing cwnd
+logic [31:0] ai = 32'd1; // additive constant for increasing cwnd
 logic [31:0] cwnd; // congestion window in number of packets
 logic [31:0] cwnd_next;
 logic [31:0] packets_in_flight; // number of packets currently in flight
 logic [31:0] packets_in_flight_next;
 logic [31:0] delay;
+logic [31:0] temp;
+logic [31:0] decrease;
+logic [63:0] mult;
 
 
 
@@ -79,11 +82,9 @@ always_ff @(posedge aclk) begin
                     cwnd_next = cwnd + 1;
                 end 
             end else begin  // RTT nominal
-                logic [31:0] temp;
-                logic [31:0] decrease;
-
                 temp = delay - target_delay;
-                decrease = (cwnd * temp) >> 10; // 1/1024 = beta/rtt_nominal rn
+                mult = cwnd * temp;
+                decrease = mult >> 10; // 1/1024 = beta/rtt_nominal rn
 
 
                 if (decrease > (cwnd >> 1)) // rn max multiplicative decrease is 1/2

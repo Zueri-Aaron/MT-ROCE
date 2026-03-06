@@ -28,6 +28,12 @@
 import lynxTypes::*;
 
 module rdma_congestion_control (
+    output logic [31:0]         dbg_base_rtt,
+    output logic [31:0]         dbg_target_delay,
+    output logic [31:0]         dbg_cwnd,
+    output logic [31:0]         dbg_packets_in_flight,
+    output logic [31:0]         dbg_delay,
+
     input  logic                aclk,
     input  logic                aresetn,
 
@@ -50,6 +56,10 @@ logic [31:0] cwnd; // congestion window in number of packets
 logic [31:0] cwnd_next;
 logic [31:0] packets_in_flight; // number of packets currently in flight
 logic [31:0] packets_in_flight_next;
+logic [31:0] delay;
+logic [31:0] temp;
+logic [31:0] decrease;
+logic [63:0] mult;
 
 metaIntf #(.STYPE(dreq_t)) queue_out ();
 
@@ -72,8 +82,6 @@ always_ff @(posedge aclk) begin
             packets_in_flight_next = (packets_in_flight_next > 0) ? packets_in_flight_next - 1 : 0;
             if (rtt < base_rtt)
                 base_rtt <= rtt;    // rn using old rtt
-
-            logic [31:0] delay;
             delay = (rtt > base_rtt) ? (rtt - base_rtt) : 32'd0;
            
 
@@ -84,11 +92,9 @@ always_ff @(posedge aclk) begin
                     cwnd_next = cwnd + 1;
                 end 
             end else begin  // RTT nominal
-                logic [31:0] temp;
-                logic [31:0] decrease;
-
                 temp = delay - target_delay;
-                decrease = (cwnd * temp) >> 10; // 1/1024 = beta/rtt_nominal rn
+                mult = temp * cwnd;
+                decrease = mult >> 10; // 1/1024 = beta/rtt_nominal rn
 
 
                 if (decrease > (cwnd >> 1)) // rn max multiplicative decrease is 1/2
@@ -132,5 +138,11 @@ queue_meta #(
     .s_meta(s_req),
     .m_meta(queue_out)
 );
+
+assign dbg_base_rtt          = base_rtt;
+assign dbg_target_delay      = target_delay;
+assign dbg_cwnd              = cwnd;
+assign dbg_packets_in_flight = packets_in_flight;
+assign dbg_delay             = delay;
 
 endmodule
