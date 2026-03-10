@@ -216,11 +216,12 @@ rdma_ack inst_rdma_ack (
     .probe18(transport_protocol_dbg.data),  //32
     .probe19(cycle_count_dbg),   // 32
     .probe20(rtt_time_dbg),      // 32
-    .probe21(dbg_base_rtt),      // 32
-    .probe22(dbg_target_delay), // 32
-    .probe23(dbg_cwnd),          // 32
-    .probe24(dbg_packets_in_flight), // 32
-    .probe25(dbg_delay)          // 32
+    .probe21(fifo_count),        // 5
+    .probe22(dbg_base_rtt),      // 32
+    .probe23(dbg_target_delay), // 32
+    .probe24(dbg_cwnd),          // 32
+    .probe25(dbg_packets_in_flight), // 32
+    .probe26(dbg_delay)          // 32
 );
 `endif
 
