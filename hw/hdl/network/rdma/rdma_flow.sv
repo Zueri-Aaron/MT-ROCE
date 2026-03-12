@@ -42,7 +42,7 @@ module rdma_flow (
     input  logic                aclk,
     input  logic                aresetn,
 
-    input logic[31:0]          rtt
+    input logic [31:0]         rtt
 );
 
 localparam integer RDMA_N_OST = RDMA_N_WR_OUTSTANDING;
@@ -67,6 +67,10 @@ logic [RDMA_OST_BITS-1:0] tail, tail_next;
 logic [RDMA_OST_BITS-1:0] head, head_next;
 logic issued, issued_next;
 
+logic ack_fire; //MT zaaron
+logic ack_fire_d; //MT zaaron
+
+assign ack_fire = s_ack.valid && s_ack.ready;
 
 // Pointer table
 ram_sp_nc #(
@@ -86,10 +90,14 @@ always_ff @(posedge aclk) begin: PROC_REG
     if (aresetn == 1'b0) begin
         state_C <= ST_IDLE;
         addr_C <= 'X;
+
+        ack_fire_d <= 1'b0;
     end
     else begin
         state_C <= state_N;
         addr_C <= addr_N;
+
+        ack_fire_d <= ack_fire;
     end
 end
 
@@ -224,7 +232,7 @@ dbg_rtt_changer inst_swift(
     .aresetn(aresetn),
 
     .rtt(rtt),
-    .ack_event(s_ack.valid && s_ack.ready),
+    .ack_event(ack_fire_d),
 
     .s_req(req_out),
     .m_req(m_req)

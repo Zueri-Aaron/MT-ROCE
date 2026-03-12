@@ -51,7 +51,7 @@ logic [31:0] base_rtt;
 logic [31:0] target_delay;
 logic [31:0] acc; // accumulated ACKs for avoiding division
 logic [31:0] acc_next;
-logic [31:0] ai = 1; // additive constant for increasing cwnd
+logic [31:0] ai = 32'd1; // additive constant for increasing cwnd
 logic [31:0] cwnd; // congestion window in number of packets
 logic [31:0] cwnd_next;
 logic [31:0] packets_in_flight; // number of packets currently in flight
@@ -66,7 +66,7 @@ metaIntf #(.STYPE(dreq_t)) queue_out ();
 always_ff @(posedge aclk) begin
     if (!aresetn) begin
         base_rtt <= 32'hFFFF_FFFF; // max value
-        target_delay <= 16; // TODO: figure out a good value for this
+        target_delay <= 32'd1000; // rn we had about 1000 cycles at 4 GHz
         cwnd <= 32'd1;
         acc <= 32'd0;
         packets_in_flight <= 32'd0;

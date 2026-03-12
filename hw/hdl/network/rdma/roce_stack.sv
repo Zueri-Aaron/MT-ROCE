@@ -132,7 +132,8 @@ rdma_flow inst_rdma_flow (
     .m_req(rdma_sq),
     .s_ack(rdma_ack),
     .m_ack(m_rdma_ack),
-    .rtt(rtt_time_dbg), //MT zaaron
+    //MT zaaron
+    .rtt(rtt_time_dbg),
     .dbg_base_rtt(dbg_base_rtt),
     .dbg_target_delay(dbg_target_delay),
     .dbg_cwnd(dbg_cwnd),
@@ -170,7 +171,7 @@ always_ff @(posedge nclk or negedge nresetn) begin
         rtt_time_dbg <= 0;
     end else begin 
         //write
-        if (s_rdma_sq.valid && s_rdma_sq.ready && fifo_count < 16) begin
+        if (rdma_sq.valid && rdma_sq.ready && fifo_count < 16) begin
             fifo_time[fifo_tail] <= cycle_count_dbg;
             fifo_tail <= (fifo_tail == 15) ? 0 : fifo_tail + 1;
         end
@@ -181,7 +182,7 @@ always_ff @(posedge nclk or negedge nresetn) begin
         end
         //count
         case ({
-            (s_rdma_sq.valid && s_rdma_sq.ready && (fifo_count < 16)),
+            (rdma_sq.valid && rdma_sq.ready && (fifo_count < 16)),
             (rdma_ack.valid && rdma_ack.ready && (fifo_count > 0))
         })
             2'b10: fifo_count <= fifo_count + 1; // write only

@@ -8,11 +8,13 @@ module dbg_rdma_congestion_control_tb;
     logic aresetn;
     logic dummy_out;
 
-    // Clock: 100 MHz (10ns period)
+    int ack_count;
+
+    // Clock: 100 MHz
     initial aclk = 0;
     always #5 aclk = ~aclk;
 
-    // DUT
+    // DUT instance
     dbg_rdma_congestion_control dut (
         .rtt(rtt),
         .ack_event(ack_event),
@@ -21,37 +23,49 @@ module dbg_rdma_congestion_control_tb;
         .dummy_out(dummy_out)
     );
 
+    // Network simulation parameters
+    parameter RTT_CYCLES = 100;
+
+    int send_times [0:999];
+    int send_ptr = 0;
+    int recv_ptr = 0;
+    int cycle_counter = 0;
+
     initial begin
-        // Initialize
         rtt = 0;
         ack_event = 0;
         aresetn = 0;
+        ack_count = 0;
 
-        // Reset for 20ns
-        #20;
+        // Reset
+        repeat (5) @(posedge aclk);
         aresetn = 1;
 
-        // ---- Test 1: Low RTT (should increase cwnd) ----
-        repeat (20) begin
-            #10;
-            rtt = 32'd100;
-            ack_event = 1;
-            #10;
-            ack_event = 0;
+        forever @(posedge aclk) begin
+
+            // global cycle counter
+            cycle_counter++;
+
+            // Packet sent by DUT
+            if (dummy_out) begin
+                send_times[send_ptr] = cycle_counter + RTT_CYCLES;
+                send_ptr++;
+            end
+
+            // ACK arrives
+            if (recv_ptr < send_ptr &&
+                cycle_counter >= send_times[recv_ptr]) begin
+
+                rtt <= RTT_CYCLES;
+                ack_event <= 1;
+
+                recv_ptr++;
+                ack_count++;
+
+            end else begin
+                ack_event <= 0;
+            end
         end
-
-        // ---- Test 2: Higher RTT (should decrease cwnd) ----
-        repeat (20) begin
-            #10;
-            rtt = 32'd200;
-            ack_event = 1;
-            #10;
-            ack_event = 0;
-        end
-
-        #200;
-
-        $stop;
     end
 
 endmodule
