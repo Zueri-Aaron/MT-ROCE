@@ -37,21 +37,43 @@ module dbg_rdma_congestion_control (
     output logic                dummy_out
 );
 
+localparam integer cwnd_values[0:15] = {10, 14, 18, 25, 34, 46, 63, 86, 117, 158, 215, 293, 398, 541, 736, 1000}; //in log2 accuracy LUT
+localparam logic[8:0] target_delay_LUT[0:15] = {9'd300, 9'd249, 9'd216, 9'd178, 9'd148, 9'd122, 9'd100, 9'd80, 9'd64, 9'd51, 9'd39, 9'd28, 9'd20, 9'd12, 9'd6, 9'd1}; // log2 accuracy LUT
+localparam logic[11:0] slope_target_delay_LUT[0:14] = {12'd3264, 12'd2112, 12'd1390, 12'd853, 12'd555, 12'd331, 12'd223, 12'd132, 12'd81, 12'd54, 12'd36, 12'd20, 12'd14, 12'd8, 12'd6}; // log2 accuracy LUT
+integer i;
+
+localparam integer decrease_factor_LUT[0:15] = {7, 8, 9, 12, 14, 17, 20, 26, 32, 41, 53, 73, 102, 171, 341}; // = 1/target_delay
+
+localparam MIN_DELAY = 16;
+
+integer seg_idx;
 logic [31:0] base_rtt;
 logic [31:0] target_delay;
 logic [31:0] acc; // accumulated ACKs for avoiding division
 logic [31:0] acc_next;
-logic [31:0] ai = 32'd1; // additive constant for increasing cwnd
+logic [31:0] ai = 1; // additive constant for increasing cwnd
 logic [31:0] cwnd; // congestion window in number of packets
 logic [31:0] cwnd_next;
 logic [31:0] packets_in_flight; // number of packets currently in flight
 logic [31:0] packets_in_flight_next;
-logic [31:0] delay;
+logic [31:0] delay; 
 logic [31:0] temp;
 logic [31:0] decrease;
-logic [63:0] mult;
+logic [50:0] mult;
+logic [40:0] scaled;
+logic [35:0] scaled_shifted;
 
-
+always_comb begin
+    target_delay = target_delay_LUT[15]; // if no match, use the last value in the LUT
+    seg_idx = 15;
+    for (i=1; i<16; i=i+1) begin
+        if (cwnd < cwnd_values[i]) begin
+            target_delay = target_delay_LUT[i-1] + ((cwnd - cwnd_values[i-1]) * slope_target_delay_LUT[i-1] >> 8);
+            seg_idx = i-1;
+            break;
+        end
+    end
+end
 
 always_ff @(posedge aclk) begin
     if (!aresetn) begin
@@ -68,11 +90,11 @@ always_ff @(posedge aclk) begin
 
         if (ack_event) begin
             packets_in_flight_next = (packets_in_flight_next > 0) ? packets_in_flight_next - 1 : 0;
-            if (rtt < base_rtt) begin
-                base_rtt <= rtt;    // rn using old rtt
-            end
-            
+            if (rtt < base_rtt)
+                base_rtt <= rtt;    
             delay = (rtt > base_rtt) ? (rtt - base_rtt) : 32'd0;
+            if (delay < MIN_DELAY)
+                delay = MIN_DELAY;
            
 
             if (delay <= target_delay) begin
@@ -82,17 +104,22 @@ always_ff @(posedge aclk) begin
                     cwnd_next = cwnd + 1;
                 end 
             end else begin  // RTT nominal
-                temp = delay - target_delay;
-                mult = cwnd * temp;
-                decrease = mult >> 10; // 1/1024 = beta/rtt_nominal rn
-
+                if (seg_idx == 15) begin
+                    decrease = cwnd >> 1;
+                end else begin
+                    temp = delay - target_delay;
+                    scaled = temp * decrease_factor_LUT[seg_idx]; 
+                    //scaled_shifted = scaled >> 5; // early shift to reduce width
+                    mult = (scaled * cwnd); 
+                    decrease = mult >> 11;
+                end
 
                 if (decrease > (cwnd >> 1)) // rn max multiplicative decrease is 1/2
                     cwnd_next = cwnd >> 1;
                 else 
                     cwnd_next = cwnd - decrease;
 
-                if (cwnd_next == 0)
+                if (cwnd_next < 1)
                     cwnd_next = 1;
 
                 if (acc_next > cwnd_next)
