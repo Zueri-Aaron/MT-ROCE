@@ -92,7 +92,7 @@ always_comb begin
     found = 1'b0;
     for (i=1; i<16; i=i+1) begin
         if (cwnd < cwnd_values[i] && !found) begin
-            target_delay = target_delay_LUT[i-1] + ((cwnd - cwnd_values[i-1]) * slope_target_delay_LUT[i-1] >> 8);
+            target_delay = target_delay_LUT[i-1] - ((cwnd - cwnd_values[i-1]) * slope_target_delay_LUT[i-1] >> 8);
             seg_idx = i-1;
             found = 1'b1;
         end

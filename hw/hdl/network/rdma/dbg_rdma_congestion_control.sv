@@ -42,7 +42,7 @@ localparam logic[8:0] target_delay_LUT[0:15] = {9'd300, 9'd249, 9'd216, 9'd178, 
 localparam logic[11:0] slope_target_delay_LUT[0:14] = {12'd3264, 12'd2112, 12'd1390, 12'd853, 12'd555, 12'd331, 12'd223, 12'd132, 12'd81, 12'd54, 12'd36, 12'd20, 12'd14, 12'd8, 12'd6}; // log2 accuracy LUT
 integer i;
 
-localparam integer decrease_factor_LUT[0:15] = {7, 8, 9, 12, 14, 17, 20, 26, 32, 41, 53, 73, 102, 171, 341}; // = 1/target_delay
+localparam integer decrease_factor_LUT[0:14] = {7, 8, 9, 12, 14, 17, 20, 26, 32, 41, 53, 73, 102, 171, 341}; // = 1/target_delay
 
 localparam MIN_DELAY = 16;
 
@@ -62,15 +62,17 @@ logic [31:0] decrease;
 logic [50:0] mult;
 logic [40:0] scaled;
 logic [35:0] scaled_shifted;
+logic found;
 
 always_comb begin
     target_delay = target_delay_LUT[15]; // if no match, use the last value in the LUT
     seg_idx = 15;
+    found = 1'b0;
     for (i=1; i<16; i=i+1) begin
-        if (cwnd < cwnd_values[i]) begin
+        if (cwnd < cwnd_values[i] && !found) begin
             target_delay = target_delay_LUT[i-1] + ((cwnd - cwnd_values[i-1]) * slope_target_delay_LUT[i-1] >> 8);
             seg_idx = i-1;
-            break;
+            found = 1'b1;
         end
     end
 end
@@ -78,7 +80,6 @@ end
 always_ff @(posedge aclk) begin
     if (!aresetn) begin
         base_rtt <= 32'hFFFF_FFFF; // max value
-        target_delay <= 32'd1000; // rn we had about 1000 cycles at 4 GHz
         cwnd <= 32'd1;
         acc <= 32'd0;
         packets_in_flight <= 32'd0;
