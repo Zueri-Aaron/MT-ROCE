@@ -47,28 +47,25 @@ module rdma_congestion_control (
 localparam integer RDMA_N_OST = RDMA_N_WR_OUTSTANDING;
 localparam integer RDMA_OST_BITS = $clog2(RDMA_N_OST);
 
-// fs_min_cwnd = 10, fs_max_cwnd = 1000, fs_range = 30% of base_rtt = 300, fs_alpha = 1056, fs_beta = -33.39
-localparam integer cwnd_values[0:15] = {10, 14, 18, 25, 34, 46, 63, 86, 117, 158, 215, 293, 398, 541, 736, 1000}; //in log2 accuracy LUT
-//{10, 13.5936, 18.4785, 25.1189, 34.1455, 46.4159, 63.0957, 85.7696, 116.591, 158.489, 215.443, 292.864, 398.107, 541.17, 735.642, 1000}
-//{300.547, 248.838, 215.512, 177.81, 147.713, 122.309, 99.6535, 80.4814, 64.2372, 50.6208, 38.6286, 28.3022, 19.5425, 12.011, 5.53468, 0.00365209}
-localparam logic[8:0] target_delay_LUT[0:15] = {9'd300, 9'd249, 9'd216, 9'd178, 9'd148, 9'd122, 9'd100, 9'd80, 9'd64, 9'd51, 9'd39, 9'd28, 9'd20, 9'd12, 9'd6, 9'd1}; // log2 accuracy LUT
-// slopes = {51/4, 33/4, 38/7, 30/9, 26/12, 22/17, 20/23, 16/31, 13/41, 12/57, 11/78, 8/105, 8/143, 6/195, 6/264}
-localparam logic[11:0] slope_target_delay_LUT[0:14] = {12'd3264, 12'd2112, 12'd1390, 12'd853, 12'd555, 12'd331, 12'd223, 12'd132, 12'd81, 12'd54, 12'd36, 12'd20, 12'd14, 12'd8, 12'd6}; // log2 accuracy LUT
-integer i;
+// fs_min_cwnd = 1, fs_max_cwnd = 16, fs_range = 25% of base_rtt, fs_alpha = 1/3 * fs_range, fs_beta = - 1/12 * fs_range
 
+//{256, 156.026, 111.736, 85.3333, 67.3156, 54.0154, 43.6785, 35.3462, 28.4444, 22.6057, 17.5825, 13.2011, 9.3355, 5.89184, 2.79855, 0}
+localparam logic[7:0] target_delay_LUT[0:15] = {8'd256, 8'd156, 8'd112, 8'd85, 8'd67, 8'd54, 8'd44, 8'd35, 8'd28, 8'd23, 8'd18, 8'd13, 8'd9, 8'd6, 8'd3, 8'd1}; // log2 accuracy LUT
+localparam logic[3:0] precision = 10;
 //cwnd = cwnd - cwnd * (delay - target_delay) / delay => decrease = cwnd * (delay - target_delay) / delay = (delay - target_delay) * cwnd / delay
 //K = cwnd / delay => cwnd / target_delay (approx of dela, will see how bad it gets). take mid_points of cwnd_i and target_delay_i to approximate this term:
 //new decision: split cwnd and target_delay, thus adding 1 more multiplication but making the range of the number much smaller
 
-// precision is /2048
-//{6.82667, 8.2249, 9.48148, 11.5056, 13.8378, 16.7869, 20.48, 25.6, 32, 40.96, 52.5128, 73.1429, 102.4, 170.667, 341.333}
-localparam integer decrease_factor_LUT[0:14] = {7, 8, 9, 12, 14, 17, 20, 26, 32, 41, 53, 73, 102, 171, 341}; // = 1/target_delay
+//beta = 0.3
+//{0.001, 0.00164075, 0.00229113, 0.003, 0.00380299, 0.00473939, 0.005861, 0.00724263, 0.00900001, 0.0113246, 0.0145599, 0.0193922, 0.0274223, 0.0434499, 0.0914757, 0.3}
+// precision is /1024
+//{1.024, 1.68013, 2.34612, 3.072, 3.89426, 4.85314, 6.00166, 7.41645, 9.21601, 11.5964, 14.9093, 19.8576, 28.0804, 44.4927, 93.6711, 307.2}
+localparam logic[9:0] decrease_factor_LUT[0:15] = {10'd1, 10'd2, 10'd2, 10'd3, 10'd4, 10'd5, 10'd6, 10'd7, 10'd9, 10'd12, 10'd15, 10'd20, 10'd28, 10'd44, 10'd94, 10'd307}; // = beta/target_delay
+// this currently assumes base_rtt = 1000. Change maybe later in MT
 
-localparam MIN_DELAY = 16;
-
-integer seg_idx;
 logic [31:0] base_rtt;
 logic [31:0] target_delay;
+logic [7:0] target_delay_factor;
 logic [31:0] acc; // accumulated ACKs for avoiding division
 logic [31:0] acc_next;
 logic [31:0] ai = 1; // additive constant for increasing cwnd
@@ -77,32 +74,26 @@ logic [31:0] cwnd_next;
 logic [31:0] packets_in_flight; // number of packets currently in flight
 logic [31:0] packets_in_flight_next;
 logic [31:0] delay; 
-logic [31:0] temp;
+logic [3:0] cwnd_index;
+
+logic [31:0] delta;
+logic [41:0] mult1;
+logic [46:0] mult2;
 logic [31:0] decrease;
-logic [50:0] mult;
-logic [40:0] scaled;
-logic [35:0] scaled_shifted;
-logic found;
+
+
 
 metaIntf #(.STYPE(dreq_t)) queue_out ();
 
 always_comb begin
-    target_delay = target_delay_LUT[15]; // if no match, use the last value in the LUT
-    seg_idx = 15;
-    found = 1'b0;
-    for (i=1; i<16; i=i+1) begin
-        if (cwnd < cwnd_values[i] && !found) begin
-            target_delay = target_delay_LUT[i-1] - ((cwnd - cwnd_values[i-1]) * slope_target_delay_LUT[i-1] >> 8);
-            seg_idx = i-1;
-            found = 1'b1;
-        end
-    end
+    cwnd_index = (cwnd > 15) ? 4'd15 : cwnd[3:0] - 1;
+    target_delay_factor = target_delay_LUT[cwnd_index]; 
 end
 
 always_ff @(posedge aclk) begin
     if (!aresetn) begin
         base_rtt <= 32'hFFFF_FFFF; // max value
-        cwnd <= 32'd10;
+        cwnd <= 32'd1;
         acc <= 32'd0;
         packets_in_flight <= 32'd0;
         m_req.valid <= 1'b0;
@@ -118,9 +109,7 @@ always_ff @(posedge aclk) begin
             if (rtt < base_rtt)
                 base_rtt <= rtt;    
             delay = (rtt > base_rtt) ? (rtt - base_rtt) : 32'd0;
-            if (delay < MIN_DELAY)
-                delay = MIN_DELAY;
-           
+            target_delay = (target_delay_factor * base_rtt) >> precision;
 
             if (delay <= target_delay) begin
                 acc_next = acc + ai;
@@ -129,15 +118,10 @@ always_ff @(posedge aclk) begin
                     cwnd_next = cwnd + 1;
                 end 
             end else begin  // RTT nominal
-                if (seg_idx == 15) begin
-                    decrease = cwnd >> 1;
-                end else begin
-                    temp = delay - target_delay;
-                    scaled = temp * decrease_factor_LUT[seg_idx]; 
-                    //scaled_shifted = scaled >> 5; // early shift to reduce width
-                    mult = (scaled * cwnd); 
-                    decrease = mult >> 11;
-                end
+                delta = delay - target_delay;
+                mult1 = delta * decrease_factor_LUT[cwnd_index];
+                mult2 = mult1 * cwnd[4:0];
+                decrease = mult2 >> precision;
 
                 if (decrease > (cwnd >> 1)) // rn max multiplicative decrease is 1/2
                     cwnd_next = cwnd >> 1;
