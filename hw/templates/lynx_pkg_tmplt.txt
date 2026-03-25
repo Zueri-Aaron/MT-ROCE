@@ -289,7 +289,7 @@ package lynxTypes;
     parameter integer RDMA_MSN_BITS = 24;
     parameter integer RDMA_SNDRM_BITS = 8;
     parameter integer RDMA_N_RD_OUTSTANDING = 8;
-    parameter integer RDMA_N_WR_OUTSTANDING = 16;
+    parameter integer RDMA_N_WR_OUTSTANDING = 32;
     parameter integer RDMA_MAX_SINGLE_READ = 32 * 1024;
     parameter integer RDMA_MODE_PARSE = 0;
     parameter integer RDMA_MODE_RAW = 1;

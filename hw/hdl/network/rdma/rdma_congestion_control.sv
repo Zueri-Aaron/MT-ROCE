@@ -46,11 +46,14 @@ module rdma_congestion_control (
 
 localparam integer RDMA_N_OST = RDMA_N_WR_OUTSTANDING;
 localparam integer RDMA_OST_BITS = $clog2(RDMA_N_OST);
+localparam logic[4:0] MAX_CWND = 32;
 
 // fs_min_cwnd = 1, fs_max_cwnd = 16, fs_range = 25% of base_rtt, fs_alpha = 4/3 * fs_range, fs_beta = - 1/3 * fs_range
 
 //{1024, 624.103, 446.942, 341.333, 269.262, 216.062, 174.714, 141.385, 113.778, 90.423, 70.3302, 52.8045, 37.342, 23.5673, 11.1942, 0}
-localparam logic[9:0] target_delay_LUT[0:15] = {10'd1024, 10'd624, 10'd447, 10'd341, 10'd269, 10'd216, 10'd175, 10'd141, 10'd114, 10'd90, 10'd70, 10'd53, 10'd37, 10'd24, 10'd11, 10'd1}; // log2 accuracy LUT
+//localparam logic[9:0] target_delay_LUT[0:15] = {10'd1024, 10'd624, 10'd447, 10'd341, 10'd269, 10'd216, 10'd175, 10'd141, 10'd114, 10'd90, 10'd70, 10'd53, 10'd37, 10'd24, 10'd11, 10'd1}; // log2 accuracy LUT
+//{1024, 659.673, 498.27, 402.055, 336.394, 287.925, 250.256, 219.891, 194.739, 173.462, 155.156, 139.189, 125.102, 112.553, 101.28, 91.0818, 81.7969, 73.297, 65.4772, 58.2515, 51.5483, 45.3075, 39.4783, 34.0172, 28.8873, 24.0562, 19.496, 15.1824, 11.0938, 7.21145, 3.51848, 0}
+localparam logic[9:0] target_delay_LUT[0:31] = {10'd1024, 10'd660, 10'd498, 10'd402, 10'd336, 10'd288, 10'd250, 10'd220, 10'd195, 10'd173, 10'd155, 10'd139, 10'd125, 10'd113, 10'd101, 10'd91, 10'd82, 10'd73, 10'd65, 10'd58, 10'd52, 10'd45, 10'd39, 10'd34, 10'd29, 10'd24, 10'd19, 10'd15, 10'd11, 10'd7, 10'd4, 10'd1}; // log2 accuracy LUT
 
 localparam logic[3:0] precision = 10;
 //cwnd = cwnd - cwnd * (delay - target_delay) / delay => decrease = cwnd * (delay - target_delay) / delay = (delay - target_delay) * cwnd / delay
@@ -61,7 +64,9 @@ localparam logic[3:0] precision = 10;
 //{0.001, 0.00164075, 0.00229113, 0.003, 0.00380299, 0.00473939, 0.005861, 0.00724263, 0.00900001, 0.0113246, 0.0145599, 0.0193922, 0.0274223, 0.0434499, 0.0914757, 0.3}
 // precision is /1024
 //{1.024, 1.68013, 2.34612, 3.072, 3.89426, 4.85314, 6.00166, 7.41645, 9.21601, 11.5964, 14.9093, 19.8576, 28.0804, 44.4927, 93.6711, 307.2}
-localparam logic[9:0] decrease_factor_LUT[0:15] = {10'd1, 10'd2, 10'd2, 10'd3, 10'd4, 10'd5, 10'd6, 10'd7, 10'd9, 10'd12, 10'd15, 10'd20, 10'd28, 10'd44, 10'd94, 10'd307}; // = beta/target_delay
+//localparam logic[9:0] decrease_factor_LUT[0:15] = {10'd1, 10'd2, 10'd2, 10'd3, 10'd4, 10'd5, 10'd6, 10'd7, 10'd9, 10'd12, 10'd15, 10'd20, 10'd28, 10'd44, 10'd94, 10'd307}; // = beta/target_delay
+//{1.024, 1.58954, 2.10443, 2.60804, 3.11711, 3.64183, 4.19002, 4.76862, 5.38451, 6.04499, 6.75819, 7.53344, 8.38175, 9.31629, 10.3532, 11.5125, 12.8193, 14.3059, 16.0144, 18.0008, 20.3416, 23.1435, 26.5608, 30.8248, 36.2989, 43.5887, 53.7842, 69.0654, 94.5189, 145.404, 298.02, ∞}
+localparam logic[9:0] decrease_factor_LUT[0:31] = {10'd1, 10'd2, 10'd2, 10'd3, 10'd3, 10'd4, 10'd4, 10'd5, 10'd5, 10'd6, 10'd7, 10'd8, 10'd8, 10'd9, 10'd10, 10'd12, 10'd13, 10'd14, 10'd16, 10'd18, 10'd20, 10'd23, 10'd27, 10'd31, 10'd36, 10'd44, 10'd54, 10'd69, 10'd95, 10'd145, 10'd298, 10'd307}; // = beta/target_delay
 // this currently assumes base_rtt = 1000. Change maybe later in MT
 
 logic [31:0] base_rtt;
@@ -116,7 +121,7 @@ always_ff @(posedge aclk) begin
                 acc_next = acc + ai;
                 if (acc_next >= cwnd) begin
                     acc_next = acc_next - cwnd;
-                    if (cwnd != 16)
+                    if (cwnd != 32)
                         cwnd_next = cwnd + 1;
                 end 
             end else begin  // RTT nominal
