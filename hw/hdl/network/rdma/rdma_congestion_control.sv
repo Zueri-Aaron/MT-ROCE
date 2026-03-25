@@ -109,18 +109,19 @@ always_ff @(posedge aclk) begin
             if (rtt < base_rtt)
                 base_rtt <= rtt;    
             delay = (rtt > base_rtt) ? (rtt - base_rtt) : 32'd0;
-            target_delay = (target_delay_factor * base_rtt) >> precision;
+            target_delay = (target_delay_factor * base_rtt) >> precision >> 3;
 
             if (delay <= target_delay) begin
                 acc_next = acc + ai;
                 if (acc_next >= cwnd) begin
                     acc_next = acc_next - cwnd;
-                    cwnd_next = cwnd + 1;
+                    if (cwnd != 16)
+                        cwnd_next = cwnd + 1;
                 end 
             end else begin  // RTT nominal
                 delta = delay - target_delay;
                 mult1 = delta * decrease_factor_LUT[cwnd_index];
-                mult2 = mult1 * cwnd[4:0];
+                mult2 = mult1 * cwnd[4:0]; 
                 decrease = mult2 >> precision;
 
                 if (decrease > (cwnd >> 1)) // rn max multiplicative decrease is 1/2
