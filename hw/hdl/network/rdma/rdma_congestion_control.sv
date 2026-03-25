@@ -47,10 +47,11 @@ module rdma_congestion_control (
 localparam integer RDMA_N_OST = RDMA_N_WR_OUTSTANDING;
 localparam integer RDMA_OST_BITS = $clog2(RDMA_N_OST);
 
-// fs_min_cwnd = 1, fs_max_cwnd = 16, fs_range = 25% of base_rtt, fs_alpha = 1/3 * fs_range, fs_beta = - 1/12 * fs_range
+// fs_min_cwnd = 1, fs_max_cwnd = 16, fs_range = 25% of base_rtt, fs_alpha = 4/3 * fs_range, fs_beta = - 1/3 * fs_range
 
-//{256, 156.026, 111.736, 85.3333, 67.3156, 54.0154, 43.6785, 35.3462, 28.4444, 22.6057, 17.5825, 13.2011, 9.3355, 5.89184, 2.79855, 0}
-localparam logic[7:0] target_delay_LUT[0:15] = {8'd256, 8'd156, 8'd112, 8'd85, 8'd67, 8'd54, 8'd44, 8'd35, 8'd28, 8'd23, 8'd18, 8'd13, 8'd9, 8'd6, 8'd3, 8'd1}; // log2 accuracy LUT
+//{1024, 624.103, 446.942, 341.333, 269.262, 216.062, 174.714, 141.385, 113.778, 90.423, 70.3302, 52.8045, 37.342, 23.5673, 11.1942, 0}
+localparam logic[9:0] target_delay_LUT[0:15] = {10'd1024, 10'd624, 10'd447, 10'd341, 10'd269, 10'd216, 10'd175, 10'd141, 10'd114, 10'd90, 10'd70, 10'd53, 10'd37, 10'd24, 10'd11, 10'd1}; // log2 accuracy LUT
+
 localparam logic[3:0] precision = 10;
 //cwnd = cwnd - cwnd * (delay - target_delay) / delay => decrease = cwnd * (delay - target_delay) / delay = (delay - target_delay) * cwnd / delay
 //K = cwnd / delay => cwnd / target_delay (approx of dela, will see how bad it gets). take mid_points of cwnd_i and target_delay_i to approximate this term:
