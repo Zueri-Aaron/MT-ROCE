@@ -42,7 +42,8 @@ module rdma_flow (
     input  logic                aclk,
     input  logic                aresetn,
 
-    input logic [31:0]         rtt
+    input logic [31:0]          rtt,
+    input logic [31:0]          curr_clk
 );
 
 localparam integer RDMA_N_OST = RDMA_N_WR_OUTSTANDING;
@@ -233,6 +234,7 @@ dbg_rtt_changer inst_swift(
 
     .rtt(rtt),
     .ack_event(ack_fire_d),
+    .curr_clk(curr_clk),
 
     .s_req(req_out),
     .m_req(m_req)

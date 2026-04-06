@@ -39,6 +39,7 @@ module rdma_congestion_control (
 
     input  logic [31:0]         rtt,
     input  logic                ack_event,
+    input  logic [31:0]         curr_clk,
 
     metaIntf.s                  s_req,
     metaIntf.m                  m_req
@@ -86,13 +87,16 @@ logic [41:0] mult1;
 logic [46:0] mult2;
 logic [31:0] decrease;
 
-
+logic [31:0] last_decrease;
 
 metaIntf #(.STYPE(dreq_t)) queue_out ();
 
 always_comb begin
     cwnd_index = (cwnd > 15) ? 4'd15 : cwnd[3:0] - 1;
     target_delay_factor = target_delay_LUT[cwnd_index]; 
+    target_delay = (target_delay_factor * base_rtt) >> precision;
+    
+    delay = (rtt > base_rtt) ? (rtt - base_rtt) : 32'd0;
 end
 
 always_ff @(posedge aclk) begin
@@ -104,6 +108,7 @@ always_ff @(posedge aclk) begin
         m_req.valid <= 1'b0;
         queue_out.ready <= 1'b0;
         m_req.data <= 0;
+        last_decrease <= 0;
     end else begin 
         packets_in_flight_next = packets_in_flight;
         cwnd_next = cwnd;
@@ -113,8 +118,6 @@ always_ff @(posedge aclk) begin
             packets_in_flight_next = (packets_in_flight_next > 0) ? packets_in_flight_next - 1 : 0;
             if (rtt < base_rtt)
                 base_rtt <= rtt;    
-            delay = (rtt > base_rtt) ? (rtt - base_rtt) : 32'd0;
-            target_delay = (target_delay_factor * base_rtt) >> precision >> 3;
 
             if (delay <= target_delay) begin
                 acc_next = acc + 1;
@@ -123,7 +126,7 @@ always_ff @(posedge aclk) begin
                     if (cwnd != 32)
                         cwnd_next = cwnd + 1;
                 end 
-            end else begin  // RTT nominal
+            end else if (rtt < (curr_clk) - last_decrease) begin 
                 delta = delay - target_delay;
                 mult1 = delta * decrease_factor_LUT[cwnd_index];
                 mult2 = mult1 * cwnd[4:0]; 
@@ -136,6 +139,9 @@ always_ff @(posedge aclk) begin
 
                 if (cwnd_next < 1)
                     cwnd_next = 1;
+
+                if (cwnd_next < cwnd)
+                    last_decrease <= curr_clk;
 
                 if (acc_next > cwnd_next)
                     acc_next = cwnd_next;

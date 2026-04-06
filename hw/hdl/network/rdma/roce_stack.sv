@@ -134,6 +134,7 @@ rdma_flow inst_rdma_flow (
     .m_ack(m_rdma_ack),
     //MT zaaron
     .rtt(rtt_time_dbg),
+    .curr_clk(curr_clk),
     .dbg_base_rtt(dbg_base_rtt),
     .dbg_target_delay(dbg_target_delay),
     .dbg_cwnd(dbg_cwnd),
@@ -162,6 +163,7 @@ logic [31:0] fifo_time [0:15];
 logic [3:0] fifo_head, fifo_tail;
 logic [31:0] rtt_time_dbg;
 logic [4:0] fifo_count;
+logic [31:0] curr_clk;
 
 always_ff @(posedge nclk or negedge nresetn) begin
     if (!nresetn) begin
@@ -169,6 +171,7 @@ always_ff @(posedge nclk or negedge nresetn) begin
         fifo_tail <= 0;
         fifo_head <= 0;
         rtt_time_dbg <= 0;
+        curr_clk <= 0;
     end else begin 
         //write
         if (rdma_sq.valid && rdma_sq.ready && fifo_count < 16) begin
@@ -178,6 +181,7 @@ always_ff @(posedge nclk or negedge nresetn) begin
         //read
         if (rdma_ack.valid && rdma_ack.ready && fifo_count > 0) begin
             rtt_time_dbg <= cycle_count_dbg - fifo_time[fifo_head];
+            curr_clk <= cycle_count_dbg;
             fifo_head <= (fifo_head == 15) ? 0 : fifo_head + 1;
         end
         //count

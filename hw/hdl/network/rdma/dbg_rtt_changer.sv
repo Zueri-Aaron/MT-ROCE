@@ -12,6 +12,7 @@ module dbg_rtt_changer (
 
     input  logic [31:0]         rtt,
     input  logic                ack_event,
+    input  logic [31:0]         curr_clk,
 
     metaIntf.s                  s_req,
     metaIntf.m                  m_req
@@ -108,6 +109,7 @@ rdma_congestion_control inst_swift(
 
     .rtt(rtt),
     .ack_event(ack_event),
+    .curr_clk(curr_clk),
 
     .s_req(s_req),
     .m_req(m_req)
