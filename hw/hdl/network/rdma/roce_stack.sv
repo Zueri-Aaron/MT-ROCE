@@ -226,7 +226,12 @@ rdma_ack inst_rdma_ack (
     .probe23(dbg_target_delay), // 32
     .probe24(dbg_cwnd),          // 32
     .probe25(dbg_packets_in_flight), // 32
-    .probe26(dbg_delay)          // 32
+    .probe26(dbg_delay),          // 32
+    .probe27(s_rdma_sq.valid), 
+    .probe28(s_rdma_sq.ready),
+    //.probe29(s_rdma_sq.data),               // 256
+    .probe29(rdma_sq.valid),
+    .probe30(rdma_sq.ready)
 );
 `endif
 
