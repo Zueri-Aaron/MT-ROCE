@@ -56,7 +56,7 @@ localparam logic[9:0] target_delay_LUT[0:15] = {256, 156, 112, 85, 67, 54, 44, 3
 //{1024, 659.673, 498.27, 402.055, 336.394, 287.925, 250.256, 219.891, 194.739, 173.462, 155.156, 139.189, 125.102, 112.553, 101.28, 91.0818, 81.7969, 73.297, 65.4772, 58.2515, 51.5483, 45.3075, 39.4783, 34.0172, 28.8873, 24.0562, 19.496, 15.1824, 11.0938, 7.21145, 3.51848, 0}
 //localparam logic[9:0] target_delay_LUT[0:31] = {10'd1024, 10'd660, 10'd498, 10'd402, 10'd336, 10'd288, 10'd250, 10'd220, 10'd195, 10'd173, 10'd155, 10'd139, 10'd125, 10'd113, 10'd101, 10'd91, 10'd82, 10'd73, 10'd65, 10'd58, 10'd52, 10'd45, 10'd39, 10'd34, 10'd29, 10'd24, 10'd19, 10'd15, 10'd11, 10'd7, 10'd4, 10'd1}; // log2 accuracy LUT
 
-localparam logic[3:0] precision = 10;
+localparam int precision = 10;
 //cwnd = cwnd - cwnd * (delay - target_delay) / delay => decrease = cwnd * (delay - target_delay) / delay = (delay - target_delay) * cwnd / delay
 //K = cwnd / delay => cwnd / target_delay (approx of dela, will see how bad it gets). take mid_points of cwnd_i and target_delay_i to approximate this term:
 //new decision: split cwnd and target_delay, thus adding 1 more multiplication but making the range of the number much smaller
@@ -70,103 +70,228 @@ localparam logic[9:0] decrease_factor_LUT[0:15] = {10'd1, 10'd2, 10'd2, 10'd3, 1
 //localparam logic[9:0] decrease_factor_LUT[0:31] = {10'd1, 10'd2, 10'd2, 10'd3, 10'd3, 10'd4, 10'd4, 10'd5, 10'd5, 10'd6, 10'd7, 10'd8, 10'd8, 10'd9, 10'd10, 10'd12, 10'd13, 10'd14, 10'd16, 10'd18, 10'd20, 10'd23, 10'd27, 10'd31, 10'd36, 10'd44, 10'd54, 10'd69, 10'd95, 10'd145, 10'd298, 10'd307}; // = beta/target_delay
 // this currently assumes base_rtt = 1000. Change maybe later in MT
 
-logic [31:0] base_rtt;
-logic [31:0] target_delay;
-logic [7:0] target_delay_factor;
-logic [31:0] acc; // accumulated ACKs for avoiding division
-logic [31:0] acc_next;
-logic [31:0] cwnd; // congestion window in number of packets
-logic [31:0] cwnd_next;
-logic [31:0] packets_in_flight; // number of packets currently in flight
-logic [31:0] packets_in_flight_next;
-logic [31:0] delay; 
-logic [3:0] cwnd_index;
-
-logic [31:0] delta;
-logic [41:0] mult1;
-logic [46:0] mult2;
-logic [31:0] decrease;
-
-logic [31:0] last_decrease;
 
 metaIntf #(.STYPE(dreq_t)) queue_out ();
 
+logic [31:0] target_delay;
+logic [31:0] delay; 
+logic send_event;
+logic [4:0] cwnd_index;
+logic [9:0] decrease_factor;
+logic [9:0] target_delay_factor;
+
 always_comb begin
-    cwnd_index = (cwnd > 15) ? 4'd15 : cwnd[3:0] - 1;
+    cwnd_index = (cwnd >= MAX_CWND) ? 4'd15 : (cwnd == 0 ? 4'd0 : cwnd - 1);
     target_delay_factor = target_delay_LUT[cwnd_index]; 
     target_delay = (target_delay_factor * base_rtt) >> precision;
+    decrease_factor = decrease_factor_LUT[cwnd_index];
     
     delay = (rtt > base_rtt) ? (rtt - base_rtt) : 32'd0;
+    send_event = (packets_in_flight < cwnd) && queue_out.valid && m_req.ready;
 end
 
+logic [31:0] base_rtt;
+logic [31:0] curr_target_delay;
+logic [31:0] curr_delay;
+logic [9:0] curr_decrease_factor;
+logic [4:0] curr_cwnd;
+logic [4:0] curr_acc;
+logic [31:0] curr_rtt;
+logic [31:0] curr_last_decrease;
+logic [31:0] clk_stage0;
+logic stage1;
+
+//stage 0 save values
 always_ff @(posedge aclk) begin
     if (!aresetn) begin
+        curr_target_delay <= 0;
+        curr_delay <= 0;
         base_rtt <= 32'hFFFF_FFFF; // max value
-        cwnd <= 32'd1;
-        acc <= 32'd0;
-        packets_in_flight <= 32'd0;
+        curr_decrease_factor <= 0;
+        curr_cwnd <= 1;
+        curr_acc <= 0;
+        curr_rtt <= 0;
+        curr_last_decrease <= 0;
+        clk_stage0 <= 0;
+        stage1 <= 0;
+    end else if (ack_event) begin
+        curr_target_delay <= target_delay;
+        curr_delay <= delay;
+        curr_decrease_factor <= decrease_factor;
+        curr_cwnd <= cwnd;
+        curr_acc <= acc;
+        curr_rtt <= rtt;
+        curr_last_decrease <= last_decrease;
+        clk_stage0 <= curr_clk;
+        if (rtt < base_rtt) begin
+            base_rtt <= rtt;
+        end
+        stage1 <= 1;
+    end else begin
+        stage1 <= 0;
+    end
+end
+
+logic [4:0] cwnd_stage1;
+logic [4:0] acc_stage1;
+logic [31:0] delta_stage1;
+logic [9:0] decrease_factor_stage1;
+logic [31:0] clk_stage1;
+logic is_increase_stage1;
+logic can_decrease_stage1;
+logic stage2;
+
+//stage 1 decision and delta
+always_ff @(posedge aclk) begin
+    if (!aresetn) begin
+        cwnd_stage1 <= 1;
+        acc_stage1 <= 0;
+        delta_stage1 <= 0;
+        decrease_factor_stage1 <= 0;
+        clk_stage1 <= 0;
+        is_increase_stage1 <= 1;
+        can_decrease_stage1 <= 1;
+        stage2 <= 0;
+    end else if (stage1) begin
+        is_increase_stage1 <= (curr_delay <= curr_target_delay);
+        can_decrease_stage1 <= (curr_clk - curr_last_decrease > curr_rtt);
+        delta_stage1 <= (curr_delay > curr_target_delay) ? curr_delay - curr_target_delay : 32'd0;
+        decrease_factor_stage1 <= curr_decrease_factor;
+        clk_stage1 <= clk_stage0;
+        cwnd_stage1 <= curr_cwnd;
+        acc_stage1 <= curr_acc;
+        stage2 <= 1;
+    end else begin
+        stage2 <= 0;
+    end
+end
+
+logic [41:0] mult_stage2;
+logic [4:0] cwnd_stage2;
+logic [4:0] acc_stage2;
+logic [31:0] clk_stage2;
+logic is_increase_stage2;
+logic stage3;
+
+//stage2 multiplication part 1 and acc increase
+always_ff@(posedge aclk) begin
+    if (!aresetn) begin
+        mult_stage2 <= 0;
+        cwnd_stage2 <= 1;
+        clk_stage2 <= 0;
+        acc_stage2 <= 0;
+        is_increase_stage2 <= 1;
+        stage3 <= 0;
+    end else if (stage2) begin
+        acc_stage2 <= acc_stage1;
+        mult_stage2 <= 0;
+        if (is_increase_stage1) begin
+            acc_stage2 <= acc_stage1 + 1;
+        end else if (can_decrease_stage1) begin
+            mult_stage2 <= delta_stage1 * decrease_factor_stage1;
+        end 
+        
+        clk_stage2 <= clk_stage1;
+        cwnd_stage2 <= cwnd_stage1;
+        is_increase_stage2 <= is_increase_stage1 || !can_decrease_stage1; 
+        stage3 <= 1;
+    end else begin
+        stage3 <= 0;
+    end
+end
+
+logic [46:0] decrease_stage3;
+logic [4:0] cwnd_stage3;
+logic [4:0] acc_stage3;
+logic [31:0] clk_stage3;
+logic is_increase_stage3;
+logic stage4;
+
+//stage3 second muliplication
+always_ff@(posedge aclk) begin
+    if (!aresetn) begin
+        decrease_stage3 <= 0;
+        cwnd_stage3 <= 1;
+        acc_stage3 <= 0;
+        clk_stage3 <= 0;
+        is_increase_stage3 <= 1;
+        stage4 <= 0;
+    end else if (stage3) begin
+        if (!is_increase_stage2) begin
+            decrease_stage3 <= (mult_stage2 * cwnd_stage2) >> precision;
+        end else begin
+            decrease_stage3 <= 0;
+        end
+        cwnd_stage3 <= cwnd_stage2;
+        acc_stage3 <= acc_stage2;
+        clk_stage3 <= clk_stage2;
+        is_increase_stage3 <= is_increase_stage2;
+        stage4 <= 1;
+    end else begin
+        stage4 <= 0;
+    end
+end
+
+logic [4:0] cwnd;
+logic [4:0] next_cwnd;
+logic [4:0] acc;
+logic [31:0] last_decrease;
+
+//stage4 final cwnd decision
+always_ff@(posedge aclk) begin
+    if (!aresetn) begin
+        cwnd <= 1;
+        acc <= 0;
+        last_decrease <= 0;
+    end else if (stage4) begin
+        next_cwnd = cwnd_stage3;
+        if (is_increase_stage3) begin
+            if (acc_stage3 >= cwnd_stage3) begin
+                next_cwnd = (cwnd_stage3 < MAX_CWND) ? cwnd_stage3 + 1 : cwnd_stage3;
+                acc <= acc_stage3 - cwnd_stage3;
+            end else begin
+                acc <= acc_stage3;
+            end
+        end else begin
+            if (decrease_stage3 > (cwnd_stage3 >> 1))
+                next_cwnd = cwnd_stage3 >> 1;
+            else
+                next_cwnd = cwnd_stage3 - decrease_stage3[4:0];
+            if (next_cwnd == 0)
+                next_cwnd = 1;
+            if (next_cwnd < cwnd_stage3)
+                last_decrease <= clk_stage3;
+            if (acc_stage3 > next_cwnd)
+                acc <= next_cwnd;
+            else begin
+                acc <= acc_stage3;
+            end
+        end
+        cwnd <= next_cwnd;
+    end
+end
+
+logic [31:0] packets_in_flight;
+
+//congestion window logic
+always_ff@(posedge aclk) begin
+    if (!aresetn) begin
         m_req.valid <= 1'b0;
         queue_out.ready <= 1'b0;
         m_req.data <= 0;
-        last_decrease <= 0;
-    end else begin 
-        packets_in_flight_next = packets_in_flight;
-        cwnd_next = cwnd;
-        acc_next = acc;
-
-        if (ack_event) begin
-            packets_in_flight_next = (packets_in_flight_next > 0) ? packets_in_flight_next - 1 : 0;
-            if (rtt < base_rtt)
-                base_rtt <= rtt;    
-
-            if (delay <= target_delay) begin
-                acc_next = acc + 1;
-                if (acc_next >= cwnd) begin
-                    acc_next = acc_next - cwnd;
-                    if (cwnd != 32)
-                        cwnd_next = cwnd + 1;
-                end 
-            end else if (rtt < (curr_clk) - last_decrease) begin 
-                delta = delay - target_delay;
-                mult1 = delta * decrease_factor_LUT[cwnd_index];
-                mult2 = mult1 * cwnd[4:0]; 
-                decrease = mult2 >> precision;
-
-                if (decrease > (cwnd >> 1)) // rn max multiplicative decrease is 1/2
-                    cwnd_next = cwnd >> 1;
-                else 
-                    cwnd_next = cwnd - decrease;
-
-                if (cwnd_next < 1)
-                    cwnd_next = 1;
-
-                if (cwnd_next < cwnd)
-                    last_decrease <= curr_clk;
-
-                if (acc_next > cwnd_next)
-                    acc_next = cwnd_next;
-            end
-        end
-
-        //congestion window logic
-        m_req.valid <= 1'b0;
+        packets_in_flight <= 0;
+    end else begin
         m_req.data <= queue_out.data;
-        queue_out.ready <= 1'b0;
 
-        if (packets_in_flight_next < cwnd_next) begin
-            m_req.valid <= queue_out.valid;
-            queue_out.ready <= m_req.ready;
-            if (queue_out.valid && m_req.ready) begin
-                packets_in_flight_next = packets_in_flight_next + 1;
-            end
-        end
-        packets_in_flight <= packets_in_flight_next;
-        cwnd <= cwnd_next;
-        acc <= acc_next;
+        m_req.valid <= send_event;
+        queue_out.ready <= send_event;
+
+        packets_in_flight <= packets_in_flight 
+                   + (send_event ? 1 : 0) 
+                   - ((ack_event && packets_in_flight > 0) ? 1 : 0);
     end
-
-    
 end
+
 
 queue_meta #(
     .QDEPTH(RDMA_N_OST)
