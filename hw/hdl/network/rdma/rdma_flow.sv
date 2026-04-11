@@ -32,6 +32,10 @@ module rdma_flow (
     output logic [31:0]         dbg_cwnd,
     output logic [31:0]         dbg_packets_in_flight,
     output logic [31:0]         dbg_delay,
+    output logic                dbg_m_req_ready,
+    output logic                dbg_queue_out_valid,
+    output logic                dbg_can_send,
+    output logic                fire_dbg,
 
     metaIntf.s                  s_req,
     metaIntf.m                  m_req,
@@ -228,6 +232,10 @@ dbg_rtt_changer inst_swift(
     .dbg_cwnd(dbg_cwnd),
     .dbg_packets_in_flight(dbg_packets_in_flight),
     .dbg_delay(dbg_delay),
+    .dbg_m_req_ready(dbg_m_req_ready),
+    .dbg_queue_out_valid(dbg_queue_out_valid),
+    .dbg_can_send(dbg_can_send),
+    .fire_dbg(fire_dbg),
 
     .aclk(aclk),
     .aresetn(aresetn),

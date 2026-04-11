@@ -139,7 +139,11 @@ rdma_flow inst_rdma_flow (
     .dbg_target_delay(dbg_target_delay),
     .dbg_cwnd(dbg_cwnd),
     .dbg_packets_in_flight(dbg_packets_in_flight),
-    .dbg_delay(dbg_delay)
+    .dbg_delay(dbg_delay),
+    .dbg_m_req_ready(dbg_m_req_ready),
+    .dbg_queue_out_valid(dbg_queue_out_valid),
+    .dbg_can_send(dbg_can_send),
+    .fire_dbg(fire_dbg)
 );
 
 logic [31:0] dbg_base_rtt;
@@ -147,6 +151,11 @@ logic [31:0] dbg_target_delay;
 logic [31:0] dbg_cwnd;
 logic [31:0] dbg_packets_in_flight;
 logic [31:0] dbg_delay;
+logic dbg_m_req_ready;
+logic dbg_queue_out_valid;
+logic dbg_can_send;
+logic fire_dbg;
+
 
 //MT zaaron clock for debugging
 logic [31:0] cycle_count_dbg;
@@ -231,7 +240,11 @@ rdma_ack inst_rdma_ack (
     .probe28(s_rdma_sq.ready),
     //.probe29(s_rdma_sq.data),               // 256
     .probe29(rdma_sq.valid),
-    .probe30(rdma_sq.ready)
+    .probe30(rdma_sq.ready),
+    .probe31(dbg_m_req_ready),
+    .probe32(dbg_queue_out_valid),
+    .probe33(dbg_can_send),
+    .probe34(fire_dbg)
 );
 `endif
 

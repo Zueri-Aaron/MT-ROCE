@@ -33,6 +33,10 @@ module rdma_congestion_control (
     output logic [31:0]         dbg_cwnd,
     output logic [31:0]         dbg_packets_in_flight,
     output logic [31:0]         dbg_delay,
+    output logic                dbg_m_req_ready,
+    output logic                dbg_queue_out_valid,
+    output logic                dbg_can_send,
+    output logic                fire_dbg,
 
     input  logic                aclk,
     input  logic                aresetn,
@@ -75,7 +79,6 @@ metaIntf #(.STYPE(dreq_t)) queue_out ();
 
 logic [31:0] target_delay;
 logic [31:0] delay; 
-logic send_event;
 logic [4:0] cwnd_index;
 logic [9:0] decrease_factor;
 logic [9:0] target_delay_factor;
@@ -87,7 +90,6 @@ always_comb begin
     decrease_factor = decrease_factor_LUT[cwnd_index];
     
     delay = (rtt > base_rtt) ? (rtt - base_rtt) : 32'd0;
-    send_event = (packets_in_flight < cwnd) && queue_out.valid && m_req.ready;
 end
 
 logic [31:0] base_rtt;
@@ -271,25 +273,37 @@ always_ff@(posedge aclk) begin
     end
 end
 
-logic [31:0] packets_in_flight;
+logic [4:0] packets_in_flight;
+logic can_send;
+assign can_send = (packets_in_flight < cwnd);
+
+assign m_req.valid = can_send && queue_out.valid;
+assign queue_out.ready = can_send && m_req.ready;
+assign m_req.data = queue_out.data;
+
+logic fire;
+assign fire = m_req.valid && m_req.ready;
+
+logic [4:0] inflight_next;
+
+always_comb begin
+    inflight_next = packets_in_flight;
+
+    if (fire)
+        inflight_next++;
+
+    if (ack_event)
+        inflight_next--;
+end
 
 //congestion window logic
 always_ff@(posedge aclk) begin
     if (!aresetn) begin
-        m_req.valid <= 1'b0;
-        queue_out.ready <= 1'b0;
-        m_req.data <= 0;
         packets_in_flight <= 0;
-    end else begin
-        m_req.data <= queue_out.data;
-
-        m_req.valid <= send_event;
-        queue_out.ready <= send_event;
-
-        packets_in_flight <= packets_in_flight 
-                   + (send_event ? 1 : 0) 
-                   - ((ack_event && packets_in_flight > 0) ? 1 : 0);
-    end
+    end else if (inflight_next > MAX_CWND) //underflow
+        packets_in_flight <= 0;
+    else
+        packets_in_flight <= inflight_next;
 end
 
 
@@ -307,5 +321,9 @@ assign dbg_target_delay      = target_delay;
 assign dbg_cwnd              = cwnd;
 assign dbg_packets_in_flight = packets_in_flight;
 assign dbg_delay             = delay;
+assign dbg_m_req_ready       = m_req.ready;
+assign dbg_queue_out_valid   = queue_out.valid;
+assign dbg_can_send           = can_send;
+assign fire_dbg               = fire;
 
 endmodule
