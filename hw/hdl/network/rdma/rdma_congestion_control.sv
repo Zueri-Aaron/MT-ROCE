@@ -255,17 +255,20 @@ always_ff@(posedge aclk) begin
                 acc <= acc_stage3;
             end
         end else begin
-            if (decrease_stage3 > (cwnd_stage3 >> 1))
+            if (decrease_stage3 > (cwnd_stage3 >> 1)) begin
                 next_cwnd = cwnd_stage3 >> 1;
-            else
+            end else begin
                 next_cwnd = cwnd_stage3 - decrease_stage3[4:0];
-            if (next_cwnd == 0)
+            end
+            if (next_cwnd == 0) begin
                 next_cwnd = 1;
-            if (next_cwnd < cwnd_stage3)
+            end
+            if (next_cwnd < cwnd_stage3) begin
                 last_decrease <= clk_stage3;
-            if (acc_stage3 > next_cwnd)
+            end
+            if (acc_stage3 > next_cwnd) begin
                 acc <= next_cwnd;
-            else begin
+            end else begin
                 acc <= acc_stage3;
             end
         end
