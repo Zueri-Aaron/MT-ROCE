@@ -40,20 +40,46 @@ constexpr bool const IS_CLIENT = false;
 
 // Note, how the Coyote thread is passed by reference; to avoid creating a copy of 
 // the thread object which can lead to undefined behaviour and bugs. 
-void run_write_only_server(
-    coyote::cThread &coyote_thread, coyote::rdmaSg &sg, int *mem, uint n_runs
+void run_2_to_1_server(
+    coyote::cThread &coyote_thread_1, coyote::cThread &coyote_thread_2, coyote::rdmaSg &sg, int *mem1, int *mem2, uint n_runs
 ) {
-    coyote_thread.clearCompleted();
-    coyote_thread.connSync(IS_CLIENT);
+    coyote_thread_1.clearCompleted();
+    coyote_thread_1.connSync(IS_CLIENT);
+    std::cout << "synced with client 1\n" << std::flush;
 
     // Wait for client writes to complete
-    while (coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) != n_runs) {
-        std::cout << "server waiting on " << coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes\n" << std::flush;
+    while (coyote_thread_1.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) != n_runs) {
+        std::cout << "server received " << coyote_thread_1.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes\n" << std::flush;
         std::this_thread::sleep_for(1s);
-        std::cout << "cool\n" << std::flush;
+    }
+    std::cout << "Phase 1 done\n" << std::flush;
+
+    coyote_thread_1.clearCompleted();
+    coyote_thread_1.connSync(IS_CLIENT);
+
+    coyote_thread_2.clearCompleted();
+    coyote_thread_2.connSync(IS_CLIENT);
+
+    std::cout << "starting Phase 2\n" << std::flush;
+
+    while (coyote_thread_1.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) != n_runs || coyote_thread_2.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) != n_runs) {
+        std::cout << "server received " << coyote_thread_1.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes from client 1 and \n" << coyote_thread_2.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes from client 2." << std::flush;
+        std::this_thread::sleep_for(1s);
+    }
+    std::cout << "Phase 2 done\n" << std::flush;
+    coyote_thread_1.connSync(IS_CLIENT);
+
+    coyote_thread_2.clearCompleted();
+    coyote_thread_2.connSync(IS_CLIENT);
+    std::cout << "starting Phase 3\n" << std::flush;
+
+    while (coyote_thread_2.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) != n_runs) {
+        std::cout << "server received " << coyote_thread_2.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes\n" << std::flush;
+        std::this_thread::sleep_for(1s);
     }
 
-    coyote_thread.invoke(coyote::CoyoteOper::REMOTE_RDMA_WRITE, sg);
+    coyote_thread_2.connSync(IS_CLIENT);
+
 }
 
 
@@ -69,24 +95,30 @@ int main(int argc, char *argv[])  {
     boost::program_options::store(boost::program_options::parse_command_line(argc, argv, runtime_options), command_line_arguments);
     boost::program_options::notify(command_line_arguments);
 
+    std::cout << "server invoking cThreads\n" << std::flush;
     // Allocate Coyothe threa and set-up RDMA connections, buffer etc.
     // initRDMA is explained in more detail in client/main.cpp
-    coyote::cThread coyote_thread(DEFAULT_VFPGA_ID, getpid());
-    int *mem = (int *) coyote_thread.initRDMA(size, coyote::DEF_PORT);
-    if (!mem) { throw std::runtime_error("Could not allocate memory; exiting..."); }
+    coyote::cThread coyote_thread_1(DEFAULT_VFPGA_ID, getpid());
+    int *mem1 = (int *) coyote_thread_1.initRDMA(size, coyote::DEF_PORT);
+    if (!mem1) { throw std::runtime_error("Could not allocate memory for thread 1; exiting..."); }
+
+    coyote::cThread coyote_thread_2(DEFAULT_VFPGA_ID, getpid());
+    int *mem2 = (int *) coyote_thread_2.initRDMA(size, coyote::DEF_PORT+1);
+    if (!mem2) { throw std::runtime_error("Could not allocate memory for thread 2; exiting..."); }
 
     std::cout << "server waiting on client writes\n" << std::flush;
     // Benchmark sweep; exactly like done in the client code
     HEADER("RDMA BENCHMARK: SERVER");
     coyote::rdmaSg sg = { .len = size };
-    run_write_only_server(
-        coyote_thread,
+    run_2_to_1_server(
+        coyote_thread_1,
+        coyote_thread_2,
         sg,
-        mem,
+        mem1,
+        mem2,
         n_runs
     );
     // Final sync and exit
     std::cout << "server finished\n" << std::flush;
-    coyote_thread.connSync(IS_CLIENT);
     return EXIT_SUCCESS;
 }

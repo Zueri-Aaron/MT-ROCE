@@ -42,7 +42,7 @@ constexpr bool const IS_CLIENT = true;
 
 // Note, how the Coyote thread is passed by reference; to avoid creating a copy of 
 // the thread object which can lead to undefined behaviour and bugs. 
-void run_write_only(
+void run_2to1_client(
     coyote::cThread &coyote_thread, coyote::rdmaSg &sg, 
     int *mem, uint n_runs
 ) {
@@ -67,25 +67,28 @@ void run_write_only(
           
     for (uint i = 0; i < n_runs; i++) {
         coyote_thread.invoke(coyote::CoyoteOper::REMOTE_RDMA_WRITE, sg);
-        std::this_thread::sleep_for(0.1s);
     }
-    using namespace std::chrono_literals;
-    while (coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) != 1) {
-        std::cout << "client waiting on " << coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes\n" << std::flush;
-        std::this_thread::sleep_for(1s);
-        std::cout << "cool\n" << std::flush;
+    std::cout << "client 1 issued all writes in Phase 1\n" << std::flush;
+
+    coyote_thread.clearCompleted();
+    coyote_thread.connSync(IS_CLIENT);
+
+    for (uint i = 0; i < n_runs; i++) {
+        coyote_thread.invoke(coyote::CoyoteOper::REMOTE_RDMA_WRITE, sg);
     }
+    std::cout << "client 1 issued all writes in Phase 2\n" << std::flush;
 }
 
 int main(int argc, char *argv[])  {
     std::string server_ip;
-    unsigned int size, n_runs;
+    unsigned int size, n_runs, client_number;
 
     boost::program_options::options_description runtime_options("Coyote Perf RDMA Options");
     runtime_options.add_options()
         ("ip_address,i", boost::program_options::value<std::string>(&server_ip), "Server's IP address")
         ("runs,r", boost::program_options::value<unsigned int>(&n_runs)->default_value(N_RUNS_DEFAULT), "Number of times to repeat the test")
-        ("size,x", boost::program_options::value<unsigned int>(&size)->default_value(64), "Starting (minimum) transfer size");
+        ("size,x", boost::program_options::value<unsigned int>(&size)->default_value(64), "Starting (minimum) transfer size")
+        ("client_number,c", boost::program_options::value<unsigned int>(&client_number)->default_value(0), "Client number");
     boost::program_options::variables_map command_line_arguments;
     boost::program_options::store(boost::program_options::parse_command_line(argc, argv, runtime_options), command_line_arguments);
     boost::program_options::notify(command_line_arguments);
@@ -96,20 +99,20 @@ int main(int argc, char *argv[])  {
     }
 
     coyote::cThread coyote_thread(DEFAULT_VFPGA_ID, getpid(), 0);
-    int *mem = (int *) coyote_thread.initRDMA(size, coyote::DEF_PORT, server_ip.c_str());
+    int *mem = (int *) coyote_thread.initRDMA(size, coyote::DEF_PORT + client_number, server_ip.c_str());
     if (!mem) { throw std::runtime_error("Could not allocate memory; exiting..."); }
 
     HEADER("RDMA BENCHMARK: CLIENT");
     coyote::rdmaSg sg = { .len = size };
 
-    run_write_only(
+    run_2to1_client(
         coyote_thread,
         sg,
         mem,
         n_runs
     );
     
-    std::cout << "very cool\n" << std::flush;
+    std::cout << "exiting\n" << std::flush;
     coyote_thread.connSync(IS_CLIENT);
     return EXIT_SUCCESS;
 }
