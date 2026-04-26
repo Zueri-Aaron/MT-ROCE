@@ -160,7 +160,7 @@ logic fire_dbg;
 //MT zaaron clock for debugging
 logic [31:0] cycle_count_dbg;
 
-always_ff @(posedge nclk or negedge nresetn) begin
+always_ff @(posedge nclk) begin
     if (!nresetn)
         cycle_count_dbg <= 32'd0;
     else
@@ -174,7 +174,7 @@ logic [31:0] rtt_time_dbg;
 logic [4:0] fifo_count;
 logic [31:0] curr_clk;
 
-always_ff @(posedge nclk or negedge nresetn) begin
+always_ff @(posedge nclk) begin
     if (!nresetn) begin
         fifo_count <= 0;
         fifo_tail <= 0;
