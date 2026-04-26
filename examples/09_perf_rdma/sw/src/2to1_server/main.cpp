@@ -52,6 +52,7 @@ void run_2_to_1_server(
         std::cout << "server received " << coyote_thread_1.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes\n" << std::flush;
         std::this_thread::sleep_for(1s);
     }
+    std::cout << "server received " << coyote_thread_1.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes\n" << std::flush;
     std::cout << "Phase 1 done\n" << std::flush;
 
     coyote_thread_1.clearCompleted();
@@ -63,9 +64,12 @@ void run_2_to_1_server(
     std::cout << "starting Phase 2\n" << std::flush;
 
     while (coyote_thread_1.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) != n_runs || coyote_thread_2.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) != n_runs) {
-        std::cout << "server received " << coyote_thread_1.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes from client 1 and \n" << coyote_thread_2.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes from client 2." << std::flush;
+        std::cout << "server received " << coyote_thread_1.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes from client 1 and \n" 
+        << coyote_thread_2.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes from client 2.\n" << std::flush;
         std::this_thread::sleep_for(1s);
     }
+    std::cout << "server received " << coyote_thread_1.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes from client 1 and \n" 
+    << coyote_thread_2.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes from client 2.\n" << std::flush;
     std::cout << "Phase 2 done\n" << std::flush;
     coyote_thread_1.connSync(IS_CLIENT);
 
@@ -77,7 +81,7 @@ void run_2_to_1_server(
         std::cout << "server received " << coyote_thread_2.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes\n" << std::flush;
         std::this_thread::sleep_for(1s);
     }
-
+    std::cout << "server received " << coyote_thread_2.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes\n" << std::flush;
     coyote_thread_2.connSync(IS_CLIENT);
 
 }
@@ -101,6 +105,8 @@ int main(int argc, char *argv[])  {
     coyote::cThread coyote_thread_1(DEFAULT_VFPGA_ID, getpid());
     int *mem1 = (int *) coyote_thread_1.initRDMA(size, coyote::DEF_PORT);
     if (!mem1) { throw std::runtime_error("Could not allocate memory for thread 1; exiting..."); }
+
+    std::cout << "first client connected\n" << std::flush;
 
     coyote::cThread coyote_thread_2(DEFAULT_VFPGA_ID, getpid());
     int *mem2 = (int *) coyote_thread_2.initRDMA(size, coyote::DEF_PORT+1);

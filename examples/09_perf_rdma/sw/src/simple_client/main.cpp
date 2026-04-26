@@ -67,14 +67,10 @@ void run_write_only(
           
     for (uint i = 0; i < n_runs; i++) {
         coyote_thread.invoke(coyote::CoyoteOper::REMOTE_RDMA_WRITE, sg);
-        std::this_thread::sleep_for(0.1s);
+        //std::this_thread::sleep_for(0.1s);
     }
     using namespace std::chrono_literals;
-    while (coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) != 1) {
-        std::cout << "client waiting on " << coyote_thread.checkCompleted(coyote::CoyoteOper::LOCAL_WRITE) << " completed writes\n" << std::flush;
-        std::this_thread::sleep_for(1s);
-        std::cout << "cool\n" << std::flush;
-    }
+    std::cout << "client sent " << n_runs << " writes\n" << std::flush;
 }
 
 int main(int argc, char *argv[])  {
@@ -109,7 +105,6 @@ int main(int argc, char *argv[])  {
         n_runs
     );
     
-    std::cout << "very cool\n" << std::flush;
     coyote_thread.connSync(IS_CLIENT);
     return EXIT_SUCCESS;
 }
