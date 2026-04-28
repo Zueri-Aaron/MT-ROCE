@@ -122,14 +122,122 @@ assign rdma_ack.data.ack.strm = ack_meta_data[32+RDMA_QPN_BITS+1+DEST_BITS+:STRM
 assign rdma_ack.data.ack.rsrvd = 0;
 assign rdma_ack.data.last = ack_meta_data[32+RDMA_QPN_BITS+1+DEST_BITS+STRM_BITS+:1];
 
+logic [31:0] dbg_base_rtt;
+logic [31:0] dbg_target_delay;
+logic [31:0] dbg_cwnd;
+logic [31:0] dbg_packets_in_flight;
+logic [31:0] dbg_delay;
+logic dbg_m_req_ready;
+logic dbg_queue_out_valid;
+logic dbg_can_send;
+logic fire_dbg;
+
+
+//MT zaaron clock for debugging
+logic [31:0] cycle_count_dbg;
+
+always_ff @(posedge nclk) begin
+    if (!nresetn)
+        cycle_count_dbg <= 32'd0;
+    else
+        cycle_count_dbg <= cycle_count_dbg + 1;
+end
+
+//MT zaaron simple FIFO Queue for timer TODO: replace with proper FIFO queue
+logic [31:0] fifo_time [0:15];
+logic [3:0] fifo_head, fifo_tail;
+logic [31:0] rtt_time_dbg;
+logic [4:0] fifo_count;
+logic [31:0] curr_clk;
+
+always_ff @(posedge nclk) begin
+    if (!nresetn) begin
+        fifo_count <= 0;
+        fifo_tail <= 0;
+        fifo_head <= 0;
+        rtt_time_dbg <= 0;
+        curr_clk <= 0;
+    end else begin 
+        //write
+        if (rdma_sq.valid && rdma_sq.ready && fifo_count < 16) begin
+            fifo_time[fifo_tail] <= cycle_count_dbg;
+            fifo_tail <= (fifo_tail == 15) ? 0 : fifo_tail + 1;
+        end
+        //read
+        if (rdma_ack.valid && rdma_ack.ready && fifo_count > 0) begin
+            rtt_time_dbg <= cycle_count_dbg - fifo_time[fifo_head];
+            curr_clk <= cycle_count_dbg;
+            fifo_head <= (fifo_head == 15) ? 0 : fifo_head + 1;
+        end
+        //count
+        case ({
+            (rdma_sq.valid && rdma_sq.ready && (fifo_count < 16)),
+            (rdma_ack.valid && rdma_ack.ready && (fifo_count > 0))
+        })
+            2'b10: fifo_count <= fifo_count + 1; // write only
+            2'b01: fifo_count <= fifo_count - 1; // read only
+            default: ;                           // no change
+        endcase
+    end
+end
+
 rdma_flow inst_rdma_flow (
     .aclk(nclk),
     .aresetn(nresetn),
     .s_req(s_rdma_sq),
     .m_req(rdma_sq),
     .s_ack(rdma_ack),
-    .m_ack(m_rdma_ack)
+    .m_ack(m_rdma_ack),
+    //MT zaaron
+    .rtt(rtt_time_dbg),
+    .curr_clk(curr_clk),
+    .dbg_base_rtt(dbg_base_rtt),
+    .dbg_target_delay(dbg_target_delay),
+    .dbg_cwnd(dbg_cwnd),
+    .dbg_packets_in_flight(dbg_packets_in_flight),
+    .dbg_delay(dbg_delay),
+    .dbg_m_req_ready(dbg_m_req_ready),
+    .dbg_queue_out_valid(dbg_queue_out_valid),
+    .dbg_can_send(dbg_can_send),
+    .fire_dbg(fire_dbg)
 );
+
+//MT zaaron
+`ifdef DBG_IBV
+rdma_ack inst_rdma_ack (
+    .clk(nclk),
+    .probe0(s_axis_rx.tvalid),
+    .probe1(s_axis_rx.tready),
+    .probe2(s_axis_rx.tdata),     // 512
+    .probe3(s_axis_rx.tkeep),     // 64
+    .probe4(s_axis_rx.tlast),
+    .probe5(rdma_ack.valid),
+    .probe6(rdma_ack.ready),
+    .probe7(ack_meta_data),    // 96
+    .probe8(m_axis_tx.tvalid),
+    .probe9(m_axis_tx.tready),
+    .probe10(m_axis_tx.tdata),     // 512
+    .probe11(m_axis_tx.tkeep),     // 64
+    .probe12(m_axis_tx.tlast),
+    .probe13(cycle_count_dbg),   // 32
+    .probe14(rtt_time_dbg),      // 32
+    .probe15(fifo_count),        // 5
+    .probe16(dbg_base_rtt),      // 32
+    .probe17(dbg_target_delay), // 32
+    .probe18(dbg_cwnd),          // 32
+    .probe19(dbg_packets_in_flight), // 32
+    .probe20(dbg_delay),          // 32
+    .probe21(s_rdma_sq.valid), 
+    .probe22(s_rdma_sq.ready),
+    //.probe29(s_rdma_sq.data),               // 256
+    .probe23(rdma_sq.valid),
+    .probe24(rdma_sq.ready),
+    .probe25(dbg_m_req_ready),
+    .probe26(dbg_queue_out_valid),
+    .probe27(dbg_can_send),
+    .probe28(fire_dbg)
+);
+`endif
 
 ///////////////////////////////////////////////////////////////////////////
 //

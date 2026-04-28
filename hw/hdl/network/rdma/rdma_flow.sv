@@ -27,6 +27,16 @@
 import lynxTypes::*;
 
 module rdma_flow (
+    output logic [31:0]         dbg_base_rtt,
+    output logic [31:0]         dbg_target_delay,
+    output logic [31:0]         dbg_cwnd,
+    output logic [31:0]         dbg_packets_in_flight,
+    output logic [31:0]         dbg_delay,
+    output logic                dbg_m_req_ready,
+    output logic                dbg_queue_out_valid,
+    output logic                dbg_can_send,
+    output logic                fire_dbg,
+
     metaIntf.s                  s_req,
     metaIntf.m                  m_req,
 
@@ -34,7 +44,10 @@ module rdma_flow (
     metaIntf.m                  m_ack,
 
     input  logic                aclk,
-    input  logic                aresetn
+    input  logic                aresetn,
+
+    input logic [31:0]          rtt,
+    input logic [31:0]          curr_clk
 );
 
 localparam integer RDMA_N_OST = RDMA_N_WR_OUTSTANDING;
@@ -59,6 +72,10 @@ logic [RDMA_OST_BITS-1:0] tail, tail_next;
 logic [RDMA_OST_BITS-1:0] head, head_next;
 logic issued, issued_next;
 
+logic ack_fire; //MT zaaron
+logic ack_fire_d; //MT zaaron
+
+assign ack_fire = s_ack.valid && s_ack.ready;
 
 // Pointer table
 ram_sp_nc #(
@@ -78,10 +95,14 @@ always_ff @(posedge aclk) begin: PROC_REG
     if (aresetn == 1'b0) begin
         state_C <= ST_IDLE;
         addr_C <= 'X;
+
+        ack_fire_d <= 1'b0;
     end
     else begin
         state_C <= state_N;
         addr_C <= addr_N;
+
+        ack_fire_d <= ack_fire;
     end
 end
 
@@ -194,6 +215,7 @@ queue_meta #(
 );
 
 // REQ queue
+/*
 queue_meta #(
     .QDEPTH(RDMA_N_OST)
 ) inst_sq (
@@ -201,6 +223,28 @@ queue_meta #(
     .aresetn(aresetn),
     .s_meta(req_out),
     .m_meta(m_req)
+);*/
+
+rdma_congestion_control inst_swift(
+    .dbg_base_rtt(dbg_base_rtt),
+    .dbg_target_delay(dbg_target_delay),
+    .dbg_cwnd(dbg_cwnd),
+    .dbg_packets_in_flight(dbg_packets_in_flight),
+    .dbg_delay(dbg_delay),
+    .dbg_m_req_ready(dbg_m_req_ready),
+    .dbg_queue_out_valid(dbg_queue_out_valid),
+    .dbg_can_send(dbg_can_send),
+    .fire_dbg(fire_dbg),
+
+    .aclk(aclk),
+    .aresetn(aresetn),
+
+    .rtt(rtt),
+    .ack_event(ack_fire_d),
+    .curr_clk(curr_clk),
+
+    .s_req(req_out),
+    .m_req(m_req)
 );
 
 endmodule
