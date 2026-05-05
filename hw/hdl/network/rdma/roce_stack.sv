@@ -235,7 +235,57 @@ rdma_ack inst_rdma_ack (
     .probe25(dbg_m_req_ready),
     .probe26(dbg_queue_out_valid),
     .probe27(dbg_can_send),
-    .probe28(fire_dbg)
+    .probe28(fire_dbg),
+    .probe29(m_rdma_ack.valid),
+    .probe30(m_rdma_ack.ready),
+    .probe31(m_rdma_ack.data)    // 96
+);
+
+mux_ila inst_mux_ila (
+    .clk(nclk),
+    .probe0(rdma_rd_req.valid),
+    .probe1(rdma_rd_req.ready),
+    .probe2(rdma_rd_req.data),   // 128
+    .probe3(m_rdma_rd_req.valid),
+    .probe4(m_rdma_rd_req.ready),
+    .probe5(m_rdma_rd_req.data),   // 128
+    .probe6(s_axis_rdma_rd_req.tvalid),
+    .probe7(s_axis_rdma_rd_req.tready),
+    .probe8(s_axis_rdma_rd_req.tdata),   // 512
+    .probe9(s_axis_rdma_rd_req.tkeep),   // 64
+    .probe10(s_axis_rdma_rd_req.tlast),
+    .probe11(s_axis_rdma_rd_rsp.tvalid),
+    .probe12(s_axis_rdma_rd_rsp.tready),
+    .probe13(s_axis_rdma_rd_rsp.tdata),   // 512
+    .probe14(s_axis_rdma_rd_rsp.tkeep),   // 64
+    .probe15(s_axis_rdma_rd_rsp.tlast),
+    .probe16(axis_rdma_rd.tvalid),
+    .probe17(axis_rdma_rd.tready),
+    .probe18(axis_rdma_rd.tdata),   // 512
+    .probe19(axis_rdma_rd.tkeep),   // 64
+    .probe20(axis_rdma_rd.tlast),
+    .probe21(m_rdma_mem_rd_cmd.valid),
+    .probe22(m_rdma_mem_rd_cmd.ready),
+    .probe23(m_rdma_mem_rd_cmd.data),   // 96
+    .probe24(m_rdma_mem_wr_cmd.valid),
+    .probe25(m_rdma_mem_wr_cmd.ready),
+    .probe26(m_rdma_mem_wr_cmd.data),   // 96
+    .probe27(s_axis_rdma_mem_rd.tvalid),
+    .probe28(s_axis_rdma_mem_rd.tready),
+    .probe29(s_axis_rdma_mem_rd.tdata),   // 512
+    .probe30(s_axis_rdma_mem_rd.tkeep),   // 64
+    .probe31(s_axis_rdma_mem_rd.tlast),
+    .probe32(m_axis_rdma_mem_wr.tvalid),
+    .probe33(m_axis_rdma_mem_wr.tready),
+    .probe34(m_axis_rdma_mem_wr.tdata),   // 512
+    .probe35(m_axis_rdma_mem_wr.tkeep),   // 64
+    .probe36(m_axis_rdma_mem_wr.tlast),
+    .probe37(trimmer_to_icrc.tvalid),
+    .probe38(trimmer_to_icrc.tready),
+    .probe39(trimmer_to_icrc.tdata),   // 512
+    .probe40(roce_to_icrc.tdata),   // 64
+    .probe41(roce_to_icrc.tvalid),
+    .probe42(roce_to_icrc.tready)
 );
 `endif
 
