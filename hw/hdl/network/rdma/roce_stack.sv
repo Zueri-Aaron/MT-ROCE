@@ -267,6 +267,27 @@ assign rdma_wr_req.ready = m_rdma_wr_req.ready;
 // RoCE stack
 //
 
+// MT zaaron
+rdma_ack inst_rdma_ack (
+    .probe0(s_axis_rx.tvalid),
+    .probe1(s_axis_rx.tready),
+    .probe2(s_axis_rx.tdata),     // 512
+    .probe3(s_axis_rx.tkeep),     // 64
+    .probe4(s_axis_rx.tlast),
+    .probe5(rdma_ack.valid),
+    .probe6(rdma_ack.ready),
+    .probe7(ack_meta_data),    // 96
+    .probe8(m_axis_tx.tvalid),
+    .probe9(m_axis_tx.tready),
+    .probe10(m_axis_tx.tdata),     // 512
+    .probe11(m_axis_tx.tkeep),     // 64
+    .probe12(m_axis_tx.tlast),
+    .probe13(s_rdma_sq.valid),
+    .probe14(s_rdma_sq.ready),
+    .probe15(rdma_sq.valid),
+    .probe16(rdma_sq.ready)
+);
+
 /* ila_rdma inst_ila_rdma (
     .clk(nclk),  
     .probe0(s_rdma_qp_interface.valid), 
