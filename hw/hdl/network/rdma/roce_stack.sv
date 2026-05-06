@@ -269,6 +269,7 @@ assign rdma_wr_req.ready = m_rdma_wr_req.ready;
 
 // MT zaaron
 rdma_ack inst_rdma_ack (
+    .clk(nclk),
     .probe0(s_axis_rx.tvalid),
     .probe1(s_axis_rx.tready),
     .probe2(s_axis_rx.tdata),     // 512
