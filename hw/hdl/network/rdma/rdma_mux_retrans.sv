@@ -327,8 +327,8 @@ always_comb begin
                 s_axis_user_rsp.tready = 1'b0;
                 s_axis_ddr.tready = 1'b0;
 
-                axis_net.tvalid = s_axis_user_req.tvalid & s_axis_user_req.tready;
-                axis_ddr_wr.tvalid = s_axis_user_req.tvalid & s_axis_user_req.tready;
+                axis_net.tvalid = s_axis_user_req.tvalid;
+                axis_ddr_wr.tvalid = s_axis_user_req.tvalid;
             end
         end
         else begin
@@ -363,5 +363,41 @@ assign axis_ddr_wr.tlast = (cnt_ddr_wr == 1);
 //
 // DEBUG
 //
+
+//MT zaaron
+//LEN_BITS = 28, BEAT_LOG_BITS = $clog2(AXI_DATA_BITS/8), AXI_DATA_BITS = 512
+retrans_mux_ila inst_retrans_mux_ila (
+    .clk(aclk),
+    .probe0(s_req_net.valid),
+    .probe1(s_req_net.ready),
+    .probe2(m_axis_net.tvalid),
+    .probe3(m_axis_net.tready),
+    .probe4(m_axis_net.tdata),   // 512
+    .probe5(m_axis_net.tkeep),   // 64
+    .probe6(m_axis_net.tlast),
+    .probe7(cnt_C),                 // 28-9+1 = 20
+    .probe8(cnt_N),                  // 28-9+1 = 20
+    .probe9(state_C),
+    .probe10(tr_done),          
+    .probe11(seq_src_valid),
+    .probe12(seq_src_ready),
+    .probe13(actv_C),
+    .probe14(rd_C),
+    .probe15(s_axis_user_rsp.tvalid),
+    .probe16(s_axis_user_rsp.tready),
+    .probe17(s_axis_user_req.tvalid),
+    .probe18(s_axis_user_req.tready),
+    .probe19(s_axis_ddr.tvalid),
+    .probe20(s_axis_ddr.tready),
+    .probe21(len_next),                  // 28
+    .probe22(state_N),
+    .probe23(axis_net.tvalid),
+    .probe24(axis_net.tready),
+    .probe25(axis_net.tdata),   // 512
+    .probe26(axis_net.tkeep),   // 64
+    .probe27(axis_net.tlast),
+    .probe28(axis_ddr_wr.tvalid),
+    .probe29(axis_ddr_wr.tready)
+);
 
 endmodule

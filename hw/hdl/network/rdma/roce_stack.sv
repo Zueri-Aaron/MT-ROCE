@@ -285,7 +285,9 @@ mux_ila inst_mux_ila (
     .probe39(trimmer_to_icrc.tdata),   // 512
     .probe40(roce_to_icrc.tdata),   // 64
     .probe41(roce_to_icrc.tvalid),
-    .probe42(roce_to_icrc.tready)
+    .probe42(roce_to_icrc.tready),
+    .probe43(rdma_sq.valid),
+    .probe44(m_axis_tx.tvalid)
 );
 `endif
 
