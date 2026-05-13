@@ -300,7 +300,7 @@ always_ff @ (posedge aclk) begin
     if(aresetn == 1'b0) begin 
         cnt_ddr_wr <= 1'b0; 
     end else begin 
-        if(s_req_net.valid) begin 
+        if(s_req_net.valid && s_req_net.ready) begin 
             // Once a new command comes in, set the transmission counter to the length transmitted via the command interface 
             cnt_ddr_wr <= s_req_net.data.len[LEN_BITS-1:0]/64; 
         end else begin
@@ -397,7 +397,11 @@ retrans_mux_ila inst_retrans_mux_ila (
     .probe26(axis_net.tkeep),   // 64
     .probe27(axis_net.tlast),
     .probe28(axis_ddr_wr.tvalid),
-    .probe29(axis_ddr_wr.tready)
+    .probe29(axis_ddr_wr.tready),
+    .probe30(axis_ddr_wr.tlast),
+    .probe31(s_axis_user_req.tlast),
+    .probe32(s_axis_user_rsp.tlast),
+    .probe33(s_axis_ddr.tlast)
 );
 
 endmodule
