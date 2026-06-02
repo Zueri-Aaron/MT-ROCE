@@ -1,0 +1,17 @@
+# compile verilog/system verilog design source files
+sv xil_defaultlib  \
+"../../../../../hw/hdl/network/rdma/lynx_min_pkg.sv" \
+"../../../../../hw/hdl/network/rdma/dbg_fifo.sv" \
+"../../../../../hw/hdl/network/rdma/dbg_metaIntf.sv" \
+"../../../../../hw/hdl/network/rdma/dbg_network_model.sv" \
+"../../../../../hw/hdl/network/rdma/dbg_queue_meta.sv" \
+"../../../../../hw/hdl/network/rdma/dbg_ram_sp_nc.sv" \
+"../../../../../hw/hdl/network/rdma/dbg_rdma_flow.sv" \
+"../../../../../hw/hdl/network/rdma/dbg_rdma_swift.sv" \
+"../../../../../hw/hdl/network/rdma/dbg_swift_tb.sv" \
+
+# compile glbl module
+verilog xil_defaultlib "glbl.v"
+
+# Do not sort compile order
+nosort

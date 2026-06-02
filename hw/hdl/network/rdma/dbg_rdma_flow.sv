@@ -1,0 +1,254 @@
+/**
+ * This file is part of the Coyote <https://github.com/fpgasystems/Coyote>
+ *
+ * MIT Licence
+ * Copyright (c) 2025, Systems Group, ETH Zurich
+ * All rights reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+`include "dbg_metaIntf.sv"
+import lynx_min_pkg::*;
+
+module dbg_rdma_flow (
+    output logic [31:0]         dbg_base_rtt,
+    output logic [31:0]         dbg_target_delay,
+    output logic [31:0]         dbg_cwnd,
+    output logic [31:0]         dbg_packets_in_flight,
+    output logic [31:0]         dbg_delay,
+    output logic                dbg_m_req_ready,
+    output logic                dbg_queue_out_valid,
+    output logic                dbg_can_send,
+    output logic                fire_dbg,
+
+    dbg_metaIntf.s                  s_req,
+    dbg_metaIntf.m                  m_req,
+
+    dbg_metaIntf.s                  s_ack,
+    dbg_metaIntf.m                  m_ack,
+
+    input  logic                aclk,
+    input  logic                aresetn,
+
+    input logic [31:0]          rtt,
+    input logic [31:0]          curr_clk
+);
+
+localparam integer PID_BITS = 6;
+localparam integer N_REGIONS_BITS = 1;
+localparam integer RDMA_N_OST = 16;
+localparam integer RDMA_OST_BITS = $clog2(RDMA_N_OST);
+localparam integer RD_OP = 0;
+localparam integer WR_OP = 1;
+
+// -- FSM
+typedef enum logic[2:0]  {ST_IDLE, ST_ACK_LUP_WAIT, ST_REQ_LUP_WAIT, ST_ACK_LUP, ST_REQ_LUP} state_t;
+logic [2:0] state_C, state_N;
+logic [1+N_REGIONS_BITS+PID_BITS-1:0] addr_C, addr_N;
+
+logic [1:0] ssn_wr;
+logic [1+N_REGIONS_BITS+PID_BITS-1:0] ssn_addr;
+logic [15:0] ssn_in;
+logic [15:0] ssn_out;
+
+dbg_metaIntf #(.STYPE(ack_t)) ack_que_in ();
+dbg_metaIntf #(.STYPE(dreq_t)) req_out ();
+
+logic [RDMA_OST_BITS-1:0] tail, tail_next;
+logic [RDMA_OST_BITS-1:0] head, head_next;
+logic issued, issued_next;
+
+logic ack_fire; //MT zaaron
+logic ack_fire_d; //MT zaaron
+
+assign ack_fire = s_ack.valid && s_ack.ready;
+
+// Pointer table
+dbg_ram_sp_nc #(
+    .ADDR_BITS(1+N_REGIONS_BITS+PID_BITS),
+    .DATA_BITS(16)
+) inst_pntr_table (
+    .clk(aclk),
+    .a_en(1'b1),
+    .a_we(ssn_wr),
+    .a_addr(ssn_addr),
+    .a_data_in(ssn_in),
+    .a_data_out(ssn_out)
+);
+
+// REG
+always_ff @(posedge aclk) begin: PROC_REG
+    if (aresetn == 1'b0) begin
+        state_C <= ST_IDLE;
+        addr_C <= 'X;
+
+        ack_fire_d <= 1'b0;
+    end
+    else begin
+        state_C <= state_N;
+        addr_C <= addr_N;
+
+        ack_fire_d <= ack_fire;
+    end
+end
+
+// NSL
+always_comb begin: NSL
+	state_N = state_C;
+
+	case(state_C)
+		ST_IDLE: 
+			state_N = (s_ack.valid) ? ST_ACK_LUP_WAIT : (s_req.valid & req_out.ready ? ST_REQ_LUP_WAIT : ST_IDLE);
+
+        ST_ACK_LUP_WAIT:
+            state_N = ST_ACK_LUP;
+
+        ST_REQ_LUP_WAIT:
+            state_N = ST_REQ_LUP;
+
+        ST_REQ_LUP:
+            state_N = ST_IDLE;
+
+        ST_ACK_LUP:
+            state_N = ST_IDLE;
+
+	endcase // state_C
+end
+
+// DP
+assign ssn_in = {7'h00, issued_next, head_next, tail_next};
+assign issued = ssn_out[2*RDMA_OST_BITS];
+assign head = ssn_out[RDMA_OST_BITS+:RDMA_OST_BITS];
+assign tail = ssn_out[0+:RDMA_OST_BITS];
+
+always_comb begin: DP
+    addr_N = addr_C;
+
+    // ACKs
+    s_ack.ready = 1'b0;
+
+    ack_que_in.valid = 1'b0;
+    ack_que_in.data = s_ack.data.ack;
+
+    // Req
+    s_req.ready = 1'b0;
+    req_out.valid = 1'b0;
+    req_out.data = s_req.data;
+    req_out.data.req_1.offs = head;
+
+    // Table
+    ssn_wr = 0;
+    ssn_addr = 0;
+    
+    // Pointers
+    head_next = 0;
+    tail_next = 0;
+    issued_next = 0;
+
+    case(state_C)
+        ST_IDLE: begin
+            if(s_ack.valid) begin
+                s_ack.ready = 1'b1;
+                ack_que_in.valid = s_ack.data.last;
+
+                ssn_addr = {is_opcode_rd_resp(s_ack.data.ack.opcode), s_ack.data.ack.vfid[N_REGIONS_BITS-1:0], s_ack.data.ack.pid};
+                addr_N = ssn_addr;
+            end
+            else if(s_req.valid & req_out.ready) begin
+                ssn_addr = {is_opcode_rd_req(s_req.data.req_1.opcode), s_req.data.req_1.vfid[N_REGIONS_BITS-1:0], s_req.data.req_1.pid};
+                addr_N = ssn_addr;
+            end
+        end
+
+        ST_ACK_LUP: begin
+            head_next = head;
+            tail_next = tail + 1;
+            if(head == tail_next) 
+                issued_next = 1'b0;
+            else
+                issued_next = issued;
+
+            ssn_wr = ~0;
+            ssn_addr = addr_C;
+        end
+
+        ST_REQ_LUP: begin
+            if(!issued || (head != tail)) begin
+                req_out.valid = 1'b1;
+                s_req.ready = 1'b1;       
+
+                head_next = head + 1;
+                tail_next = tail;
+                issued_next = 1'b1;
+
+                ssn_wr = ~0;
+                ssn_addr = addr_C;
+            end
+        end
+
+    endcase
+
+end
+
+// ACK queue
+dbg_queue_meta #(
+    .QDEPTH(RDMA_N_OST)
+) inst_cq (
+    .aclk(aclk),
+    .aresetn(aresetn),
+    .s_meta(ack_que_in),
+    .m_meta(m_ack)
+);
+
+// REQ queue
+/*
+queue_meta #(
+    .QDEPTH(RDMA_N_OST)
+) inst_sq (
+    .aclk(aclk),
+    .aresetn(aresetn),
+    .s_meta(req_out),
+    .m_meta(m_req)
+);*/
+
+// MT zaaron Congestion control
+dbg_rdma_swift inst_swift(
+    .dbg_base_rtt(dbg_base_rtt),
+    .dbg_target_delay(dbg_target_delay),
+    .dbg_cwnd(dbg_cwnd),
+    .dbg_packets_in_flight(dbg_packets_in_flight),
+    .dbg_delay(dbg_delay),
+    .dbg_m_req_ready(dbg_m_req_ready),
+    .dbg_queue_out_valid(dbg_queue_out_valid),
+    .dbg_can_send(dbg_can_send),
+    .fire_dbg(fire_dbg),
+
+    .aclk(aclk),
+    .aresetn(aresetn),
+
+    .rtt(rtt),
+    .ack_event(ack_fire_d),
+    .curr_clk(curr_clk),
+
+    .s_req(req_out),
+    .m_req(m_req)
+);
+
+endmodule

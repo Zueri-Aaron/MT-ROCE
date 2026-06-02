@@ -2,12 +2,21 @@
 
 module dbg_rdma_congestion_control_tb;
 
+    logic [31:0]         dbg_base_rtt;
+    logic [31:0]         dbg_target_delay;
+    logic [31:0]         dbg_cwnd;
+    logic [31:0]         dbg_packets_in_flight;
+    logic [31:0]         dbg_delay;
+    logic                dbg_can_send;
+    logic                fire_dbg;
+
 
     logic [31:0] rtt;
     logic ack_event;
     logic aclk;
     logic aresetn;
-    logic dummy_out;
+    logic send_enable;
+    logic packet_available;
 
     int packet_count;
     int ack_count;
@@ -24,7 +33,15 @@ module dbg_rdma_congestion_control_tb;
         .curr_clk(curr_clk),
         .aclk(aclk),
         .aresetn(aresetn),
-        .dummy_out(dummy_out)
+        .send_enable(send_enable),
+        .packet_available(packet_available),
+        .dbg_base_rtt(dbg_base_rtt),
+        .dbg_target_delay(dbg_target_delay),
+        .dbg_cwnd(dbg_cwnd),
+        .dbg_packets_in_flight(dbg_packets_in_flight),
+        .dbg_delay(dbg_delay),
+        .dbg_can_send(dbg_can_send),
+        .fire_dbg(fire_dbg)
     );
 
     // Network simulation parameters
@@ -47,50 +64,57 @@ module dbg_rdma_congestion_control_tb;
         current_rtt = 0;
         ack_count = 0;
         packets_in_buffer = 0;
+        packet_available = 1;
 
         // Reset
         repeat (5) @(posedge aclk);
         aresetn = 1;
+     end
 
-        forever @(posedge aclk) begin
+     always @(posedge aclk) begin
 
-            // global cycle counter
-            cycle_counter++;
+        // global cycle counter
+        cycle_counter <= cycle_counter +1;
 
-            // Packet sent by DUT
-            if (dummy_out && packets_in_buffer < 1001) begin
-                if (packet_count < SWITCH1) begin
-                    current_rtt = RTT1;
-                end else begin 
-                    current_rtt = RTT2;
-                end
-                packet_count++;
-                send_times[send_ptr] = cycle_counter + current_rtt;
-                send_ptr = (send_ptr + 1) % 1000;
-                packets_in_buffer++;
+        // Packet sent by DUT
+        if (fire_dbg && packets_in_buffer < 1001) begin
+            if (packet_count < SWITCH1) begin
+                current_rtt = RTT1;
+            end else begin 
+                current_rtt = RTT2;
             end
-
-            // ACK arrives
-            if (packets_in_buffer > 0 &&
-                cycle_counter >= send_times[recv_ptr]) begin
-
-                if (ack_count < SWITCH1) begin
-                    rtt = RTT1;
-                end else begin 
-                    rtt = RTT2;
-                end
-                
-                ack_event = 1;
-                curr_clk = cycle_counter;
-
-                recv_ptr = (recv_ptr + 1) % 1000;
-                ack_count++;
-                packets_in_buffer--;
-
-            end else begin
-                ack_event = 0;
-            end
+            packet_count <= packet_count +1;
+            send_times[send_ptr] = cycle_counter + current_rtt;
+            send_ptr = (send_ptr + 1) % 1000;
+            packets_in_buffer <= packets_in_buffer + 1;
         end
+
+        // ACK arrives
+        if (packets_in_buffer > 0 &&
+            cycle_counter >= send_times[recv_ptr]) begin
+
+            if (ack_count < SWITCH1) begin
+                rtt = RTT1;
+            end else begin 
+                rtt = RTT2;
+            end
+            
+            ack_event = 1;
+            curr_clk = cycle_counter;
+
+            recv_ptr = (recv_ptr + 1) % 1000;
+            ack_count++;
+            packets_in_buffer--;
+
+        end else begin
+            ack_event = 0;
+        end
+    end
+
+    
+    initial begin
+    #500000;
+    $finish;
     end
 
 endmodule
