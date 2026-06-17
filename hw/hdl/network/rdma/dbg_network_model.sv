@@ -21,8 +21,7 @@ module dbg_network_model #(
 
     typedef struct packed {
         dreq_t      req;
-        int unsigned send_time;
-        int unsigned delay;
+        longint unsigned ack_time;
     } net_pkt_t;
 
     net_pkt_t fifo[$];   // simple SystemVerilog queue
@@ -35,6 +34,15 @@ module dbg_network_model #(
     int unsigned inflight_bytes;
     int signed delta_inflight;
     logic [31:0] background_load;
+
+    localparam int BASE_RTT_CYCLES = 1000;
+    localparam int LINK_BITS_PER_CYCLE = 400; // 100Gb/s @ 4ns
+
+
+
+    longint unsigned next_link_free;
+    int unsigned time_in_queue;
+    int unsigned effective_link_bits_per_cycle;
 
     assign s_ack.valid = ack_valid_r;
     assign s_ack.data.ack = ack_data_r;
@@ -50,6 +58,7 @@ module dbg_network_model #(
 
     assign background_load = load * MAX_INFLIGHT_BYTES / 100; // tweak
 
+    int unsigned queue_bytes;
     logic [31:0] queue_memory;
 
     // model queue persistence
@@ -113,9 +122,28 @@ module dbg_network_model #(
             if (fire_req) begin
                 net_pkt_t p;
 
+                longint unsigned tx_start;
+                longint unsigned tx_finish;
+                int unsigned serialization_cycles;
+                int unsigned jitter;
+                int unsigned queue_delay;
+
+                jitter = $urandom_range(0,20);
+
+                effective_link_bits_per_cycle = LINK_BITS_PER_CYCLE * (100 - load) / 100;
+
+                serialization_cycles = ((m_req.data.req_1.len * 8) + effective_link_bits_per_cycle - 1) / effective_link_bits_per_cycle;
+
+                tx_start = (curr_clk > next_link_free) ? curr_clk : next_link_free;
+
+                tx_finish = tx_start + serialization_cycles;
+
+                time_in_queue = tx_finish - curr_clk;
+
+                next_link_free <= tx_finish;
+
                 p.req       = m_req.data;
-                p.send_time = curr_clk;
-                p.delay     = gen_delay();
+                p.ack_time = tx_finish + BASE_RTT_CYCLES + jitter;
 
                 fifo.push_back(p);
 
@@ -138,7 +166,7 @@ module dbg_network_model #(
 
                 p = fifo[0];
 
-                if ((curr_clk - p.send_time) >= p.delay) begin
+                if (curr_clk >= p.ack_time) begin
                     ack_valid_r <= 1;
 
                     ack_data_r.vfid <= p.req.req_1.vfid;

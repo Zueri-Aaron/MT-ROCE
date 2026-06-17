@@ -43,6 +43,7 @@ module dbg_swift_tb;
 
     integer number_of_successful_transfers;
     integer packets_sent;
+    integer difference_at_start_of_recovery;
 
     phase_t phase;
     logic [31:0] phase_timer;
@@ -89,37 +90,45 @@ module dbg_swift_tb;
                     if (phase_timer >= 10000) begin
                         phase <= PHASE_COMPUTE;
                         phase_timer <= 0;
-                        send_credits <= send_credits + 102;
+                        send_credits <= send_credits + 100;
                     end
                 end
                 PHASE_COMPUTE: begin
                     background_load <= 5 + ($urandom % 3); 
                     incast_active <= 0;
 
-                    if (phase_timer >= 10000) begin
+                    if ((phase_timer % 5000) == 0) begin
+                        send_credits <= send_credits + 1; //total sent 10
+                    end
+
+                    if (phase_timer >= 125000) begin
                         phase <= PHASE_SYNC;
                         phase_timer <= 0;
-                        send_credits <= send_credits + 20;
                     end
                 end
                 PHASE_SYNC: begin
-                    background_load <= 80 + ($urandom % 10); 
+                    background_load <= 90 + ($urandom % 8); 
                     incast_active <= (($urandom % 1000) < 20);
 
-                    if (phase_timer >= 4000) begin 
+                    if ((phase_timer % 125) == 0) begin
+                        send_credits <= send_credits + 1;
+                    end
+
+                    if (phase_timer >= 12500) begin 
+                        difference_at_start_of_recovery <= send_credits - packets_sent;
                         phase <= PHASE_RECOVERY;
                         phase_timer <= 0;
-                        send_credits <= send_credits + 5;
                     end
                 end
                 PHASE_RECOVERY: begin
-                    background_load <= 20 + ($urandom % 5); 
+                    if (send_credits > packets_sent) begin
+                        background_load <= 60 + 20*(send_credits - packets_sent)/difference_at_start_of_recovery; 
+                    end
                     incast_active <= 0;
 
-                    if (phase_timer >= 6000) begin
+                    if (packets_sent >= send_credits) begin
                         phase <= PHASE_COMPUTE;
                         phase_timer <= 0;
-                        send_credits <= send_credits + 2;
                     end
                 end
             endcase
@@ -148,7 +157,7 @@ module dbg_swift_tb;
 
         aresetn = 1;
 
-        for (int i = 0; i < number_of_packets; i++) begin
+        for (int i = 0; i < 100; i++) begin
             wr_req.req_1.opcode = RC_RDMA_WRITE_ONLY;
             wr_req.req_1.pid    = 1;
             wr_req.req_1.vfid   = 0;

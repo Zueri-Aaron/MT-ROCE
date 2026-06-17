@@ -9,13 +9,18 @@ matplotlib.use("Agg")
 
 VCD_FILE = "dump.vcd"
 
-START_TIME_MS = 0
-END_TIME_MS = 0.5
+START_TIME_MS = 1.3
+END_TIME_MS = 1.9
+
+PRIMARY_SIGNAL = "dbg_swift_tb.dbg_cwnd[31:0]"
+#SECONDARY_SIGNAL = "dbg_swift_tb.phase"
+SECONDARY_SIGNAL = "dbg_swift_tb.rtt[31:0]"
 
 # List signals you want to plot
 SIGNALS = [
     "dbg_swift_tb.dbg_cwnd[31:0]",
     "dbg_swift_tb.phase",
+    "dbg_swift_tb.rtt[31:0]",
 ]
 
 PHASE_MAP = {
@@ -24,6 +29,13 @@ PHASE_MAP = {
     2: 3,  # SYNC -> top
     3: 2,  # RECOVERY -> below sync
 }
+
+if SECONDARY_SIGNAL == "dbg_swift_tb.rtt[31:0]":
+    secondary_color = "tab:green"
+    secondary_label = "RTT"
+else:
+    secondary_color = "tab:red"
+    secondary_label = "Phase"
 
 # ============================================================
 # Load VCD
@@ -47,6 +59,8 @@ ax2 = ax1.twinx()
 # Define colors
 color_cwnd = "tab:blue"
 color_users = "tab:red"
+color_rtt = "tab:green"
+
 
 for signal_name in SIGNALS:
 
@@ -92,15 +106,15 @@ for signal_name in SIGNALS:
             label="Congestion Window",
         )
 
-    # Plot phase on right axis
-    elif signal_name == "dbg_swift_tb.phase":
+    elif signal_name == SECONDARY_SIGNAL:
         ax2.step(
             times,
             values,
             where="post",
-            color=color_users,
-            label="Phase",
+            color=secondary_color,
+            label=secondary_label,
         )
+
 
 # Left axis styling
 ax1.set_xlabel("Time [ms]")
@@ -108,21 +122,23 @@ ax1.set_ylabel("Congestion Window Size", color=color_cwnd)
 ax1.tick_params(axis="y", labelcolor=color_cwnd)
 ax1.grid(True)
 
-# Right axis styling
-ax2.set_ylabel("Phase", color=color_users)
-ax2.tick_params(axis="y", labelcolor=color_users)
+if SECONDARY_SIGNAL == "dbg_swift_tb.phase":
+    ax2.set_ylabel("Phase", color=secondary_color)
+    ax2.tick_params(axis="y", labelcolor=secondary_color)
 
-ax2.set_yticks([0, 1, 2, 3])
+    ax2.set_yticks([0, 1, 2, 3])
+    ax2.set_yticklabels([
+        "STARTUP",
+        "COMPUTE",
+        "RECOVERY",
+        "SYNC",
+    ])
 
-ax2.set_yticklabels([
-    "STARTUP",
-    "COMPUTE",
-    "RECOVERY",
-    "SYNC",
-])
+elif SECONDARY_SIGNAL == "dbg_swift_tb.rtt[31:0]":
+    ax2.set_ylabel("RTT", color=secondary_color)
+    ax2.tick_params(axis="y", labelcolor=secondary_color)
 
 ax1.set_xlim(START_TIME_MS, END_TIME_MS)
-
 
 # Optional combined legend
 #lines1, labels1 = ax1.get_legend_handles_labels()
@@ -131,6 +147,6 @@ ax1.set_xlim(START_TIME_MS, END_TIME_MS)
 #ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper left")
 
 plt.tight_layout()
-plt.savefig("test_plot3.png", dpi=300, bbox_inches="tight")
+plt.savefig("test_plot13.png", dpi=300, bbox_inches="tight")
 
-print("Saved test_plot3.png")
+print("Saved test_plot13.png")
